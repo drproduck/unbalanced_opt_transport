@@ -7,12 +7,12 @@ from copy import copy
 np.seterr(all='warn')
 
 # hyper parameters
-t1 = 1000.0
-t2 = 1000.0
+t1 = 1.0
+t2 = 1.0
 eta = 1.0
 
 rep_str = ''
-# rep_str += f'tau_1={t1:.3f}, tau_2={t2:.3f}, eta={eta:.3f}\n'
+rep_str += f'tau_1={t1:.3f}, tau_2={t2:.3f}, eta={eta:.3f}\n'
 
 # def softmin(X, axis, eta):
 
@@ -20,6 +20,11 @@ rep_str = ''
 def get_entropy(P):
     logP = np.log(P + 1e-20)
     return -1 * np.sum(logP * P - P)
+
+def get_KL(P, Q):
+    log_ratio = np.log(P) - np.log(Q)
+    return  np.sum(P * log_ratio - P + Q)
+
 
 def get_kl(B, a, axis):
     xB = B.sum(axis=axis).reshape(-1, 1)
@@ -41,7 +46,7 @@ def f(u, v, C, r, c):
 
     return f
 
-def get_grad_norm(u, v, C, r, c):
+def get_grad_norm(u, v, C, r, c, squared=True):
     B = get_B(u, v, C)
     rB = B.sum(axis=1).reshape(-1, 1)
     ur = np.exp(- u / t1) * r
@@ -53,16 +58,27 @@ def get_grad_norm(u, v, C, r, c):
     Dv = cB - vc
     Dv = np.abs(Dv).sum().squeeze()
 
-    return Du**2 + Dv**2
+    if squared:
+        return Du**2 + Dv**2
+    else:
+        return Du + Dv
 
-eta_log_ratio_list = []
-# eta_list = np.linspace(0.1, 2, 10)
-eta_list = [1.0]
+def norm1(x, y):
+    return np.sum(np.abs(x - y))
+
+# for n_pts in np.arange(1, 100):
+eta_list = np.linspace(0.05, 1.0, 100)
+eta_ratio_list = []
 for eta in eta_list:
-    print(f'eta={eta:.3f}')
-    min_log_ratio_list = []
-    for n_pts in np.arange(1, 100):
-    # for n_pts in [2]:
+    # update values
+    grad_norm_list = []
+    f_val_list = []
+    log_ratio_list = []
+    unreg_obj_list = []
+    reg_obj_list = []
+
+    for n_pts in [10]:
+
         col_ones = np.ones((n_pts, 1))
 
         # problem-specific parameters (random)
@@ -71,35 +87,22 @@ for eta in eta_list:
         rep_str += f'a={r}\n'
         c = np.random.uniform(size=(n_pts, 1))
         # c = np.array([[2],[4]])
-
-        r = r / r.sum() * 5
-        c = c / c.sum() * 5
-        print(r.sum() - c.sum())
         rep_str += f'b={c}\n'
         C = np.random.uniform(low=1, high=10, size=(n_pts, n_pts))
         C = (C + C.T) / 2
         # C = np.array([[8, 6],[6, 8]])
         rep_str += f'C={C}\n'
-
-        # initial solution
         u = np.zeros((n_pts, 1))
         v = np.zeros((n_pts, 1))
-
-        # update values
-        grad_norm_list = []
-        f_val_list = []
-        log_ratio_list = []
-        unreg_obj_list = []
-        reg_obj_list = []
-        n_iter = 20
 
 
         # compute before any updates
         f_val = f(u, v, C, r, c)
-        grad_norm = get_grad_norm(u, v, C, r, c)
+        grad_norm = get_grad_norm(u, v, C, r, c, squared=False)
         f_val_list.append(f_val)
         grad_norm_list.append(grad_norm)
 
+        n_iter = 1000
         for i in range(n_iter):
 
             B = get_B(u, v, C)
@@ -121,8 +124,8 @@ for eta in eta_list:
             unreg_obj = dotp(C, B) + t1 * rkl + t2 * ckl
             unreg_obj_list.append(unreg_obj)
 
-            # compute gradient
-            grad_norm = get_grad_norm(u, v, C, r, c)
+            # compute gradient norm 1
+            grad_norm = get_grad_norm(u, v, C, r, c, squared=False)
             grad_norm_list.append(grad_norm)
 
             # function value
@@ -130,53 +133,19 @@ for eta in eta_list:
             f_val = f(u, v, C, r, c)
             f_val_list.append(f_val)
 
-            # unreg_obj = f_val - eta * get_entropy(B)
-            # unreg_obj_list.append(unreg_obj)
-
+            
+            # new ratio
             f_val_diff = f_val_list[-2] - f_val_list[-1]
-            # log_ratio = np.log(f_val_diff) - np.log(grad_norm_list[-2])
-            log_ratio = np.log(f_val_diff) - np.log(grad_norm_list[-2])
-            log_ratio_list.append(log_ratio)
 
-        min_log_ratio_list.append(np.min(log_ratio_list))
+            kl1 = get_KL(r * np.exp(-u / t1), a)
 
-    eta_log_ratio_list.append(copy(min_log_ratio_list))
-# rep_str += f'min log ratio={log_ratio}\n'
-rep_str = ''
+            kl2 = get_KL(c * np.exp(-v / t2), b)
+            log_ratio_list.append(f_val_diff / (kl1 + kl2) / eta)
 
-# fig, ax = plt.subplots(1,5)
-# ax[0].plot(np.arange(n_iter), log_ratio_list)
-# ax[0].set_title('$(f^k - f^{k+1}) / (||du f(u^k, v^k)||_1^2 + ||dv f(u^k, v^k)||_1^2)$')
-# ax[1].plot(np.arange(n_iter+1), grad_norm_list)
-# ax[1].set_title('grad norm squared')
-# ax[2].plot(np.arange(n_iter+1), f_val_list, label=rep_str)
-# ax[2].set_title('$f^k$ (regularized dual)')
-# 
-# start, end = ax[2].get_ylim()
-# ax[2].set_yticks(np.linspace(start, end, 20))
-# 
-# ax[3].plot(np.arange(n_iter), reg_obj_list)
-# ax[3].set_title('regularized primal')
-# 
-# start, end = ax[3].get_ylim()
-# ax[3].set_yticks(np.linspace(start, end, 20))
-# 
-# ax[4].plot(np.arange(n_iter), unreg_obj_list)
-# ax[4].set_title('unregularized')
-# print(f_val_list)
-# print(reg_obj_list)
+            if np.abs(f_val_diff) < 1e-10: break
 
-print(min_log_ratio_list)
-plt.plot(np.arange(1,100), min_log_ratio_list)
-plt.plot(np.arange(1,100), -1 * np.log(np.arange(1,100)))
-plt.title(f'eta={eta:.3f}, tau1={t1:.3f}, tau2={t2:.3f}')
+
+    eta_ratio_list.append(np.min(log_ratio_list))
+
+plt.plot(eta_list, eta_ratio_list)
 plt.show()
-
-
-# print(len(eta_log_ratio_list[0]))
-# fix, ax = plt.subplots(2,5)
-# for i in range(10):
-#     ax[i//5, i%5].plot(np.arange(1,100), eta_log_ratio_list[i])
-#     ax[i//5, i%5].plot(np.arange(1,100), -1 * np.log(1 / np.arange(1, 100))**2)
-#     ax[i//5, i%5].set_title(eta_list[i]) 
-# plt.show()
