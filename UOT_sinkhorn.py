@@ -4,7 +4,6 @@ import pdb
 import warnings
 from copy import copy
 
-np.seterr(all='warn')
 
 # hyper parameters
 t1 = 1.0
@@ -14,7 +13,6 @@ eta = 1.0
 rep_str = ''
 # rep_str += f'tau_1={t1:.3f}, tau_2={t2:.3f}, eta={eta:.3f}\n'
 
-# def softmin(X, axis, eta):
 
 
 def get_entropy(P):
@@ -23,14 +21,8 @@ def get_entropy(P):
 
 
 def get_KL(P, Q):
-    log_ratio = np.log(P) - np.log(Q)
+    log_ratio = np.log(P + 1e-20) - np.log(Q + 1e-20)
     return np.sum(P * log_ratio - P + Q)
-
-def get_kl(B, a, axis):
-    xB = B.sum(axis=axis).reshape(-1, 1)
-    log_ratio = np.log(xB / a + 1e-20)
-    ret = xB * log_ratio - xB + a
-    return ret.sum()
 
 def get_B(u, v, C):
     n, m = C.shape
@@ -66,15 +58,8 @@ def get_grad_norm(u, v, C, r, c, square=False):
     else:
         return Du + Dv
 
-eta_log_ratio_list = []
-eta_list = np.linspace(0.1, 1, 50)
-min_norm_ratio_list = []
-min_kl_ratio_list = []
-# for eta in eta_list:
-for eta in [1.0]:
-    print(f'eta={eta:.3f}')
-    # for n_pts in np.arange(1, 100):
-    for n_pts in [100]:
+def log_sinkhorn(
+    for n_pts in [10]:
         col_ones = np.ones((n_pts, 1))
 
         # problem-specific parameters (random)
@@ -101,10 +86,9 @@ for eta in [1.0]:
         f_val_list = []
         norm_ratio_list = []
         kl_ratio_list = []
-        ratio_ratio_list = []
         unreg_obj_list = []
         reg_obj_list = []
-        n_iter = 20
+        n_iter = 1000
 
 
         # compute before any updates
@@ -149,42 +133,31 @@ for eta in [1.0]:
             # unreg_obj_list.append(unreg_obj)
 
             f_val_diff = f_val_list[-2] - f_val_list[-1]
-            # norm_ratio = f_val_diff / grad_norm_list[-2]
-            norm_ratio = grad_norm_list[-2]
+            norm_ratio = f_val_diff / grad_norm_list[-2] / eta
             norm_ratio_list.append(norm_ratio)
 
             # KL ratio
             kl1 = get_KL(r * np.exp(- u_old / t1), a)
             kl2 = get_KL(c * np.exp(- v_old / t2), b)
-            # kl_ratio = f_val_diff / (kl1 + kl2)
-            kl_ratio = (kl1 + kl2)
+            kl_ratio = f_val_diff / (kl1 + kl2) / eta
             kl_ratio_list.append(kl_ratio)
 
-            ratio_ratio_list.append(kl_ratio / norm_ratio)
             # early stop
-            # if f_val_diff < 1e-10:
-            #     break
+            if f_val_diff < 1e-10:
+                break
 
         min_norm_ratio_list.append(np.min(norm_ratio_list))
         min_kl_ratio_list.append(np.min(kl_ratio_list))
 
-
     # eta_log_ratio_list.append(copy(min_log_ratio_list))
 # rep_str += f'min log ratio={log_ratio}\n'
 rep_str = ''
-print(np.min(ratio_ratio_list))
 
-# plt.plot(np.arange(n_iter), ratio_ratio_list)
-plt.plot(np.arange(n_iter), kl_ratio_list, label='kl')
-plt.plot(np.arange(n_iter), norm_ratio_list, label='norm1^2')
-plt.plot(np.arange(n_iter), ratio_ratio_list, label=f'kl / norm1^2, min={np.min(ratio_ratio_list):.3f}')
+plt.plot(eta_list, min_norm_ratio_list, label='norm_1^2 ratio')
+plt.plot(eta_list, min_kl_ratio_list, label='kl ratio')
+plt.xlabel('eta')
 plt.legend()
 plt.show()
-# plt.plot(np.arange(1,100), min_norm_ratio_list, label='norm_1^2 ratio')
-# plt.plot(np.arange(1,100), min_kl_ratio_list, label='kl ratio')
-# plt.xlabel('n')
-# plt.legend()
-# plt.show()
 
 # fig, ax = plt.subplots(1,5)
 # ax[0].plot(np.arange(n_iter), log_ratio_list)

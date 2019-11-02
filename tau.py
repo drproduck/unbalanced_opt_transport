@@ -10,7 +10,7 @@ np.seterr(all='warn')
 # hyper parameters
 t1 = 1
 t2 = 1
-eta = 1
+eta = 0.1
 
 rep_str = ''
 rep_str += f'tau_1={t1:.3f}, tau_2={t2:.3f}, eta={eta:.3f}\n'
