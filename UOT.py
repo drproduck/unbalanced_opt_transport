@@ -28,7 +28,7 @@ def unreg_f(C, u, v, r, c, eta, t1, t2):
 
 
 
-def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100):
+def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
     """
     :arg C: cost matrix
     :arg r: first marginal
@@ -84,7 +84,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100):
         err = norm1(u - u_old) + norm1(v - v_old)
         err_list.append(err)
 
-        if err < 1e-10:
+        if early_stop and err < 1e-10:
             stop_iter = i + 1
             break
 
@@ -94,6 +94,8 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100):
     info['f_val_list'] = f_val_list
     info['unreg_f_val_list'] = unreg_f_val_list
     info['err_list'] = err_list
-    info['stop_iter'] = stop_iter
+    if early_stop:
+        info['stop_iter'] = stop_iter
+    else: info['stop_iter'] = n_iter
 
     return u_list[-1], v_list[-1], info
