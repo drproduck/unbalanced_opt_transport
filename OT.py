@@ -13,6 +13,14 @@ def f(C, u, v, r, c, eta):
     f = np.sum(A) + dotp(u, r) + dotp(v, c)
     return f
 
+def f_primal(C, u, v, eta):
+    A = get_B(C, u, v, eta)
+    unreg_val = dotp(C, A)
+
+    entropy = get_entropy(A)
+
+    return unreg_val - eta * entropy
+
 def unreg_f(C, u, v, eta):
     """
     the unregularized objective with solutions u, v
@@ -40,6 +48,7 @@ def sinkhorn_ot(C, r, c, eta=1.0, n_iter=1000):
     u_list = []
     v_list = []
     f_val_list = []
+    f_primal_val_list = []
     unreg_f_val_list = []
     constraint_norm_list = []
 
@@ -53,8 +62,13 @@ def sinkhorn_ot(C, r, c, eta=1.0, n_iter=1000):
     # compute before any updates
     f_val = f(C, u, v, r, c, eta)
     f_val_list.append(f_val)
+
     unreg_f_val = unreg_f(C, u, v, eta)
     unreg_f_val_list.append(unreg_f_val)
+
+    f_primal_val = f_primal(C, u, v, eta)
+    f_primal_val_list.append(f_primal_val)
+
     rc_diff = norm1_constraint(C, u, v, r, c, eta)
     constraint_norm_list.append(rc_diff)
 
@@ -70,10 +84,15 @@ def sinkhorn_ot(C, r, c, eta=1.0, n_iter=1000):
 
         u_list.append(u)
         v_list.append(v)
+
         f_val = f(C, u, v, r, c, eta)
         f_val_list.append(f_val)
+
         unreg_f_val = unreg_f(C, u, v, eta)
         unreg_f_val_list.append(unreg_f_val)
+
+        f_primal_val = f_primal(C, u, v, eta)
+        f_primal_val_list.append(f_primal_val)
 
         rc_diff = norm1_constraint(C, u, v, r, c, eta)
         constraint_norm_list.append(rc_diff)
@@ -87,6 +106,7 @@ def sinkhorn_ot(C, r, c, eta=1.0, n_iter=1000):
     info['v_list'] = v_list
     info['f_val_list'] = f_val_list
     info['unreg_f_val_list'] = unreg_f_val_list
+    info['f_primal_val_list'] = f_primal_val_list
     info['constraint_norm_list'] = constraint_norm_list
 
     info['stop_iter'] = stop_iter

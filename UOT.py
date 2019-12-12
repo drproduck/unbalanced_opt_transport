@@ -13,9 +13,18 @@ def f(C, u, v, r, c, eta, t1, t2):
     the dual of the entropic-regularized unbalanced OT
     """
     A = get_B(C, u, v, eta)
-    f = eta * np.sum(A) + t1 * dotp(np.exp(- u / t1) - 1, r) + t2 * dotp(np.exp(- v / t2) - 1, c)
+    f = eta * np.sum(A) + t1 * dotp(np.exp(- u / t1), r) + t2 * dotp(np.exp(- v / t2), c)
 
     return f
+
+def f_primal(C, u, v, r, c, eta, t1, t2):
+    A = get_B(C, u, v, eta)
+    a = A.sum(axis=1).reshape(1, -1)
+    b = A.sum(axis=0).reshape(1, -1)
+    unreg_f_val = dotp(C, A) + t1 * get_KL(a, r) + t2 * get_KL(b, c)
+    ent = get_entropy(A)
+    return unreg_f_val - eta * ent
+
 
 def unreg_f(C, u, v, r, c, eta, t1, t2):
     """
@@ -43,7 +52,11 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
     u_list = []
     v_list = []
     f_val_list = []
+    f_primal_val_list = []
     unreg_f_val_list = []
+    sum_P_list = []
+    entropy_list = []
+    kl_list = []
     err_list = []
 
     # initial solution
@@ -56,8 +69,23 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
     # compute before any updates
     f_val = f(C, u, v, r, c, eta, t1, t2)
     f_val_list.append(f_val)
+
+    f_primal_val = f_primal(C, u, v, r, c, eta, t1, t2)
+    f_primal_val_list.append(f_primal_val)
+
     unreg_f_val = unreg_f(C, u, v, r, c, eta, t1, t2)
     unreg_f_val_list.append(unreg_f_val)
+
+    P = get_B(C, u, v, eta)
+    sum_P_list.append(P.sum())
+
+    entropy = eta * get_entropy(P)
+    entropy_list.append(entropy)
+
+    a = P.sum(axis=1).reshape(1, -1)
+    b = P.sum(axis=0).reshape(1, -1)
+    kl = t1 * get_KL(a, r) + t2 * get_KL(b, c)
+    kl_list.append(kl)
 
 
     stop_iter = n_iter
@@ -78,8 +106,23 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
 
         f_val = f(C, u, v, r, c, eta, t1, t2)
         f_val_list.append(f_val)
+
+        f_primal_val = f_primal(C, u, v, r, c, eta, t1, t2)
+        f_primal_val_list.append(f_primal_val)
+
         unreg_f_val = unreg_f(C, u, v, r, c, eta, t1, t2)
         unreg_f_val_list.append(unreg_f_val)
+
+        P = get_B(C, u, v, eta)
+        sum_P_list.append(P.sum())
+
+        entropy = eta * get_entropy(P)
+        entropy_list.append(entropy)
+
+        a = P.sum(axis=1).reshape(1, -1)
+        b = P.sum(axis=0).reshape(1, -1)
+        kl = t1 * get_KL(a, r) + t2 * get_KL(b, c)
+        kl_list.append(kl)
 
         err = norm1(u - u_old) + norm1(v - v_old)
         err_list.append(err)
@@ -92,7 +135,11 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
     info['u_list'] = u_list
     info['v_list'] = v_list
     info['f_val_list'] = f_val_list
+    info['f_primal_val_list'] = f_primal_val_list
     info['unreg_f_val_list'] = unreg_f_val_list
+    info['sum_P_list'] = sum_P_list
+    info['entropy_list'] = entropy_list
+    info['kl_list'] = kl_list
     info['err_list'] = err_list
     if early_stop:
         info['stop_iter'] = stop_iter
