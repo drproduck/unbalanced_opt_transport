@@ -19,10 +19,10 @@ def f(C, u, v, r, c, eta, t1, t2):
 
 def f_primal(C, u, v, r, c, eta, t1, t2):
     A = get_B(C, u, v, eta)
-    a = A.sum(axis=1).reshape(1, -1)
-    b = A.sum(axis=0).reshape(1, -1)
+    a = A.sum(axis=1).reshape(-1, 1)
+    b = A.sum(axis=0).reshape(-1, 1)
     unreg_f_val = dotp(C, A) + t1 * get_KL(a, r) + t2 * get_KL(b, c)
-    ent = get_entropy(A)
+    ent = get_entropy(A) 
     return unreg_f_val - eta * ent
 
 
@@ -31,8 +31,8 @@ def unreg_f(C, u, v, r, c, eta, t1, t2):
     the unregularized objective with solutions u, v
     """
     A = get_B(C, u, v, eta)
-    a = A.sum(axis=1).reshape(1, -1)
-    b = A.sum(axis=0).reshape(1, -1)
+    a = A.sum(axis=1).reshape(-1, 1)
+    b = A.sum(axis=0).reshape(-1, 1)
     return dotp(C, A) + t1 * get_KL(a, r) + t2 * get_KL(b, c)
 
 
@@ -82,8 +82,8 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
     entropy = eta * get_entropy(P)
     entropy_list.append(entropy)
 
-    a = P.sum(axis=1).reshape(1, -1)
-    b = P.sum(axis=0).reshape(1, -1)
+    a = P.sum(axis=1).reshape(-1, 1)
+    b = P.sum(axis=0).reshape(-1, 1)
     kl = t1 * get_KL(a, r) + t2 * get_KL(b, c)
     kl_list.append(kl)
 
@@ -119,8 +119,8 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
         entropy = eta * get_entropy(P)
         entropy_list.append(entropy)
 
-        a = P.sum(axis=1).reshape(1, -1)
-        b = P.sum(axis=0).reshape(1, -1)
+        a = P.sum(axis=1).reshape(-1, 1)
+        b = P.sum(axis=0).reshape(-1, 1)
         kl = t1 * get_KL(a, r) + t2 * get_KL(b, c)
         kl_list.append(kl)
 

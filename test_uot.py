@@ -3,15 +3,15 @@ import matplotlib.pyplot as plt
 from UOT import *
 import pdb
 
-nr = 10
-nc = 10
-C = np.random.uniform(low=1, high=10, size=(nr, nc))
+nr = 1000
+nc = 1000
+C = np.random.uniform(low=10, high=100, size=(nr, nc))
 C = (C + C.T) / 2
 r = np.random.uniform(low=0.1, high=1, size=(nr, 1))
 
 c = np.random.uniform(low=0.1, high=1, size=(nc, 1))
 
-u, v, info = sinkhorn_uot(C, r, c, eta=0.01, t1=10, t2=10, n_iter=10000)
+u, v, info = sinkhorn_uot(C, r, c, eta=0.1, t1=1, t2=1, n_iter=10000)
 
 fig, ax = plt.subplots(3,1)
 
@@ -31,5 +31,6 @@ ax[0].legend()
 ax[1].legend()
 ax[2].legend()
 
-print(np.min(info['unreg_f_val_list']), info['unreg_f_val_list'][-1])
+print(np.sum(info['sum_P_list'][-1]))
+print(np.sum(r), np.sum(c))
 plt.show()

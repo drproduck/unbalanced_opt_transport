@@ -9,11 +9,11 @@ def get_KL(P, Q):
     log_ratio = np.log(P) - np.log(Q)
     return np.sum(P * log_ratio - P + Q)
 
-def get_kl(B, a, axis):
-    xB = B.sum(axis=axis).reshape(-1, 1)
-    log_ratio = np.log(xB / a + 1e-20)
-    ret = xB * log_ratio - xB + a
-    return ret.sum()
+# def get_kl(B, a, axis):
+#     xB = B.sum(axis=axis).reshape(-1, 1)
+#     log_ratio = np.log(xB / a + 1e-20)
+#     ret = xB * log_ratio - xB + a
+#     return ret.sum()
 
 
 def dotp(x, y):
@@ -21,3 +21,6 @@ def dotp(x, y):
 
 def norm1(X):
     return np.sum(np.abs(X))
+
+def supnorm(X):
+    return np.max(np.abs(X))
