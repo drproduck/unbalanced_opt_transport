@@ -37,16 +37,36 @@ print('optimal value', prob.value)
 print(X.value)
 
 
-u, v, info = sinkhorn_uot(C, a.reshape(nr,1), b.reshape(nc,1), eta=0.1, t1=tau, t2=tau, n_iter=1000, early_stop=False)
-print(info['unreg_f_val_list'][-1])
 
 
-plt.plot(np.arange(1001), info['unreg_f_val_list'], c='blue')
-plt.plot([0, 1000], [prob.value, prob.value], c='red')
+# eps = 100
+# alpha = sum(a)
+# beta = sum(b)
+# S = 9 * (alpha + beta) * (2 * tau + 1) + 1
+# T = 4 * ((alpha + beta) * (np.log(alpha + beta) + np.log(10)) + 1)
+# U = S + T + eps + 2 * eps * np.log(10) / tau
+# eta = eps / U
+# print(eta)
+
+
+eps_list = np.linspace(0.9, 0.01, 100)
+eta_list = eps_list / np.log(10)
+stop_iter_list = []
+for eps, eta in zip(eps_list, eta_list):
+
+    u, v, info = sinkhorn_uot(C, a.reshape(nr,1), b.reshape(nc,1), eta=0.1, t1=tau, t2=tau, n_iter=10000, early_stop=False, eps=eps, opt_val=prob.value)
+    stop_iter_list.append(info['stop_iter'])
+    
+# plt.plot([0, 1000], [prob.value, prob.value], c='red')
+print(eps_list)
+print(stop_iter_list)
+fig, ax = plt.subplots(1,1)
+xs = np.arange(100)
+ax.plot(xs, stop_iter_list)
+start = eps_list[0]
+start = 1 / start * np.log(1 / start)
+a = stop_iter_list[0] / start
+ax.plot(xs, a / eps_list * np.log(1 / eps))
+ax.set_xticklabels(eps_list)
 plt.show()
-
-
-
-
-
 

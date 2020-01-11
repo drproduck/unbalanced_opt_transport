@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from utils import *
 from copy import copy
 
@@ -37,7 +36,7 @@ def unreg_f(C, u, v, r, c, eta, t1, t2):
 
 
 
-def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
+def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, eps=None, opt_val=None):
     """
     :arg C: cost matrix
     :arg r: first marginal
@@ -127,6 +126,10 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
         err = norm1(u - u_old) + norm1(v - v_old)
         err_list.append(err)
 
+        if eps is not None and unreg_f_val_list[-1] <= opt_val + eps:
+            stop_iter = i + 1
+            break
+
         if early_stop and err < 1e-10:
             stop_iter = i + 1
             break
@@ -141,7 +144,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True):
     info['entropy_list'] = entropy_list
     info['kl_list'] = kl_list
     info['err_list'] = err_list
-    if early_stop:
+    if early_stop or eps is not None:
         info['stop_iter'] = stop_iter
     else: info['stop_iter'] = n_iter
 
