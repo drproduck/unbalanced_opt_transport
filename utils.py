@@ -6,7 +6,7 @@ def get_entropy(P):
 
 
 def get_KL(P, Q):
-    log_ratio = np.log(P) - np.log(Q)
+    log_ratio = np.log(P + 1e-20) - np.log(Q + 1e-20)
     return np.sum(P * log_ratio - P + Q)
 
 # def get_kl(B, a, axis):
