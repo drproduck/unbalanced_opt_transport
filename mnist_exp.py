@@ -43,6 +43,7 @@ a = a.reshape(-1, 1) + 0.01
 b = b.reshape(-1, 1) + 0.01
 
 tau = 10
+print('sum C:', C.sum(), 'sum a:', a.sum(), 'sum b:', b.sum())
 
 u, v, info = sinkhorn_uot(C, a, b, eta=0.1, t1=tau, t2=tau, n_iter=10000, early_stop=True, eps=None, opt_val=None)
     

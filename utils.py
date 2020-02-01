@@ -24,3 +24,17 @@ def norm1(X):
 
 def supnorm(X):
     return np.max(np.abs(X))
+
+def round_rc(F, r, c):
+    rF = F.sum(axis=1).reshape(-1, 1)
+    x = np.minimum(r / rF, 1)
+    FF = F * x.reshape(-1, 1)
+    cF = FF.sum(axis=0).reshape(-1, 1)
+    y = np.minimum(c / cF, 1)
+    FFF = FF * y.reshape(1, -1)
+
+    err_r = r - FFF.sum(axis=1).reshape(-1, 1)
+    err_c = c - FFF.sum(axis=0).reshape(-1, 1)
+    G = FFF + err_r @ err_c.T / norm1(err_r)
+
+    return G

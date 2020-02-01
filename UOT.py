@@ -1,6 +1,7 @@
 import numpy as np
 from utils import *
 from copy import copy
+import numpy
 
 def get_B(C, u, v, eta):
     n, m = C.shape
@@ -59,8 +60,8 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
     err_list = []
 
     # initial solution
-    u = np.zeros(r.shape)
-    v = np.zeros(c.shape)
+    u = np.zeros(r.shape).astype(numpy.longdouble)
+    v = np.zeros(c.shape).astype(numpy.longdouble)
 
     u_list.append(u)
     v_list.append(v)
@@ -100,8 +101,8 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
             b = A.sum(axis=0).reshape(-1, 1)
             v = (v / eta + np.log(c) - np.log(b)) * (t2 * eta / (eta + t2))
 
-        u_list.append(u)
-        v_list.append(v)
+        u_list.append(copy(u))
+        v_list.append(copy(v))
 
         f_val = f(C, u, v, r, c, eta, t1, t2)
         f_val_list.append(f_val)

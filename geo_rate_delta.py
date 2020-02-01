@@ -15,7 +15,7 @@ r = np.random.uniform(low=0.1, high=1, size=(nr, 1))
 
 c = np.random.uniform(low=0.1, high=1, size=(nc, 1))
 
-u, v, info = sinkhorn_uot(C, r, c, eta=eta, t1=tau, t2=tau, n_iter=1000)
+u, v, info = sinkhorn_uot(C, r, c, eta=eta, t1=tau, t2=tau, early_stop=False, n_iter=2000)
 
 delta_list = []
 geom_list = []
@@ -24,7 +24,7 @@ max_ratio_list = []
 ratio_list = []
 bound_list = []
 
-
+print(info['stop_iter'])
 for i in range(info['stop_iter']):
     delta = np.max([supnorm(info['u_list'][i] - info['u_list'][-1]), supnorm(info['v_list'][i] - info['v_list'][-1])])
     delta_list.append(delta)
@@ -45,20 +45,14 @@ for i in range(info['stop_iter']):
         ratio = delta_list[-2] / delta_list[-1]
         ratio_list.append(ratio)
 
-# print(delta_list)
+print(delta_list)
 # print(geom_list)
 
 # print(info['stop_iter'])
-fig, ax = plt.subplots(2,1)
-ax[0].plot(list(range(info['stop_iter'])), delta_list, label='$\Delta^k = \max \{ ||u^k - u^*||_{\infty}, ||v^k - v^*||_{\infty} \}$')
-ax[0].plot(list(range(info['stop_iter'])), geom_list, label='$\Delta_0 (\\frac{\\tau}{\\tau + \eta})^k$')
-ax[0].legend()
-ax[0].set_xlabel('k (iteration)')
+fig, ax = plt.subplots(1,1)
 
-# ax[1].plot(range(info['stop_iter']), max_ratio_list, label='orange / blue')
-ax[1].plot(range(info['stop_iter']-1), ratio_list, label='$\Delta_{k-1} / \Delta_{k}$')
-ax[1].legend()
+ax.plot(range(info['stop_iter']-1), ratio_list[1::2], label='$\Delta_{k-1} / \Delta_{k}$')
+ax.set_xlabel('k (iterations)')
+ax.legend()
 
-ax[0].plot(range(info['stop_iter']), bound_list, label='$\\tau \\times R (\\frac{\\tau}{\\tau + \eta})^k$')
-ax[0].legend()
 plt.show()
