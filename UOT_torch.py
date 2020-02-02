@@ -1,18 +1,40 @@
 import numpy as np
 from utils import *
-from copy import copy
 import numpy
+import torch
 
+
+# utilities
+def get_entropy(P):
+    logP = torch.log(P + 1e-20)
+    return -1 * torch.sum(logP * P - P)
+
+def get_KL(P, Q):
+    log_ratio = torch.log(P + 1e-20) - torch.log(Q + 1e-20)
+    return torch.sum(P * log_ratio - P + Q)
+
+def dotp(x, y):
+    return torch.sum(x * y)
+
+def norm1(X):
+    return torch.sum(torch.abs(X))
+
+def supnorm(X):
+    return torch.max(torch.abs(X))
+
+
+# main funcs
 def get_B(C, u, v, eta):
     n, m = C.shape
     K = - C + u + v.T
-    return np.exp(K / eta)
+    return torch.exp(K / eta)
+
 
 def f_dual(B, u, v, r, c, eta, t1, t2):
     """
     the dual of the entropic-regularized unbalanced OT
     """
-    f = eta * np.sum(B) + t1 * dotp(np.exp(- u / t1), r) + t2 * dotp(np.exp(- v / t2), c)
+    f = eta * torch.sum(B) + t1 * dotp(torch.exp(- u / t1), r) + t2 * dotp(torch.exp(- v / t2), c)
 
     return f
 
@@ -21,8 +43,8 @@ def unreg_f(B, C, r, c, eta, t1, t2):
     """
     the unregularized objective with solutions u, v
     """
-    a = B.sum(axis=1).reshape(-1, 1)
-    b = B.sum(axis=0).reshape(-1, 1)
+    a = B.sum(dim=1).reshape(-1, 1)
+    b = B.sum(dim=0).reshape(-1, 1)
     return dotp(C, B) + t1 * get_KL(a, r) + t2 * get_KL(b, c)
 
 
@@ -32,7 +54,7 @@ def f_primal(unreg_f_val, B, eta):
 
 
 
-def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, eps=None, opt_val=None, save_uv=False):
+def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, eps=None, opt_val=None):
     """
     :arg C: cost matrix
     :arg r: first marginal
@@ -44,21 +66,14 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
     """
 
     # collect some stats
-    u_list = []
-    v_list = []
     f_val_list = []
     unreg_f_val_list = []
     f_primal_val_list = []
     sum_B_list = []
-    err_list = []
 
     # initial solution
-    u = np.zeros(r.shape).astype(numpy.longdouble)
-    v = np.zeros(c.shape).astype(numpy.longdouble)
-
-    if save_uv:
-        u_list.append(u)
-        v_list.append(v)
+    u = torch.zeros(r.shape, dtype=torch.float64)
+    v = torch.zeros(c.shape, dtype=torch.float64)
 
     # compute before any updates
     B = get_B(C, u, v, eta)
@@ -74,23 +89,16 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
     sum_B_list.append(B.sum())
 
 
-
     stop_iter = n_iter
     for i in range(n_iter):
-        u_old = copy(u)
-        v_old = copy(v)
         # update
         if i % 2 == 0:
-            a = B.sum(axis=1).reshape(-1, 1)
-            u = (u / eta + np.log(r) - np.log(a)) * (t1 * eta / (eta + t1))
+            a = B.sum(dim=1).reshape(-1, 1)
+            u = (u / eta + torch.log(r) - torch.log(a)) * (t1 * eta / (eta + t1))
         else:
-            b = B.sum(axis=0).reshape(-1, 1)
-            v = (v / eta + np.log(c) - np.log(b)) * (t2 * eta / (eta + t2))
+            b = B.sum(dim=0).reshape(-1, 1)
+            v = (v / eta + torch.log(c) - torch.log(b)) * (t2 * eta / (eta + t2))
 
-        if save_uv:
-            u_list.append(copy(u))
-            v_list.append(copy(v))
-	
 	# compute stats
         B = get_B(C, u, v, eta)
 
@@ -105,28 +113,17 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
 
         sum_B_list.append(B.sum())
 
-        err = norm1(u - u_old) + norm1(v - v_old)
-        err_list.append(err)
 
         if eps is not None and unreg_f_val_list[-1] <= opt_val + eps:
             stop_iter = i + 1
             break
 
-        if early_stop and err < 1e-10:
-            stop_iter = i + 1
-            break
 
     info = {}
-    if save_uv:
-        info['u_list'] = u_list
-        info['v_list'] = v_list
     info['f_val_list'] = f_val_list
     info['unreg_f_val_list'] = unreg_f_val_list
     info['f_primal_val_list'] = f_primal_val_list
     info['sum_B_list'] = sum_B_list
-    info['err_list'] = err_list
-    if early_stop or eps is not None:
-        info['stop_iter'] = stop_iter
-    else: info['stop_iter'] = n_iter
+    info['stop_iter'] = stop_iter
 
-    return u, v, info 
+    return u, v, info
