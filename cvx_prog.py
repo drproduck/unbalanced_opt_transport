@@ -16,9 +16,9 @@ C = (C + C.T) / 2
 # C = C / sum(C) * 15
 print('sum C:', C.sum())
 a = np.random.uniform(low=0.1, high=1.0, size=nr).astype(numpy.longdouble)
-a = a / a.sum() * 1
+a = a / a.sum() * 2
 b = np.random.uniform(low=0.1, high=1.0, size=nc).astype(numpy.longdouble)
-b = b / b.sum() * 1
+b = b / b.sum() * 4
 print('sum a:', a.sum(), 'sum b:', b.sum())
 
 tau = 5

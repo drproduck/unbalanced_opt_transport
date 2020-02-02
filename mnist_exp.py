@@ -5,8 +5,6 @@ from UOT import *
 from copy import copy
 from mnist import _load_mnist
 
-nr = 100
-nc = 100
 def repeat_newdim(x, n_repeat, newdim):
      x = np.expand_dims(x, axis=newdim)
      x = np.repeat(x, n_repeat, newdim)
@@ -25,7 +23,7 @@ def get_L1_C(dim):
     C = np.abs(C).sum(axis=-1)
     return C
     
-C = get_L1_C(28)
+C = get_L1_C(28).astype(np.float32)
 print(C)
 print(C.sum())
 
@@ -44,8 +42,9 @@ b = b.reshape(-1, 1) + 0.01
 
 tau = 10
 print('sum C:', C.sum(), 'sum a:', a.sum(), 'sum b:', b.sum())
+print(C.dtype, a.dtype, b.dtype)
 
-u, v, info = sinkhorn_uot(C, a, b, eta=0.1, t1=tau, t2=tau, n_iter=10000, early_stop=True, eps=None, opt_val=None)
+u, v, info = sinkhorn_uot(C, a, b, eta=0.001, t1=tau, t2=tau, n_iter=1000, early_stop=True, eps=None, opt_val=None)
     
 print(info['unreg_f_val_list'][-1])
 
