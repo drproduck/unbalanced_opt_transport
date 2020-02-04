@@ -12,14 +12,11 @@ C = (C + C.T) / 2
 r = np.random.uniform(low=0.1, high=1, size=(nr, 1)).astype(np.float64)
 c = np.random.uniform(low=0.1, high=1, size=(nc, 1)).astype(np.float64)
 
-C = torch.from_numpy(C)
-r = torch.from_numpy(r)
-c = torch.from_numpy(c)
-
 start = time()
-u, v, info = sinkhorn_uot(C, r, c, eta=0.1, t1=1, t2=1, n_iter=10000)
+u, v, info = sinkhorn_uot(C, r, c, eta=0.001, t1=1, t2=1, n_iter=1000)
 print('time elapsed:', time() - start)
 
+print(info['unreg_f_val_list'])
 fig, ax = plt.subplots(3,1)
 
 converge = info['f_val_list'][-1]

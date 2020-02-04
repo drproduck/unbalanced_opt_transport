@@ -2,6 +2,7 @@ import numpy as np
 from utils import *
 import numpy
 import torch
+from time import time
 
 
 # utilities
@@ -54,7 +55,7 @@ def f_primal(unreg_f_val, B, eta):
 
 
 
-def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, eps=None, opt_val=None):
+def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, eps=None, opt_val=None):
     """
     :arg C: cost matrix
     :arg r: first marginal
@@ -64,6 +65,11 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
     :arg t2: second Kl regularizer
     :n_iter: number of Sinkhorn iterations
     """
+
+    # convert numpy variables to torch
+    C = torch.from_numpy(C)
+    r = torch.from_numpy(r)
+    c = torch.from_numpy(c)
 
     # collect some stats
     f_val_list = []
@@ -90,6 +96,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
 
 
     stop_iter = n_iter
+    start = time()
     for i in range(n_iter):
         # update
         if i % 2 == 0:
@@ -99,7 +106,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
             b = B.sum(dim=0).reshape(-1, 1)
             v = (v / eta + torch.log(c) - torch.log(b)) * (t2 * eta / (eta + t2))
 
-	# compute stats
+	    # compute stats
         B = get_B(C, u, v, eta)
 
         f_val = f_dual(B, u, v, r, c, eta, t1, t2)
@@ -117,6 +124,11 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
         if eps is not None and unreg_f_val_list[-1] <= opt_val + eps:
             stop_iter = i + 1
             break
+
+        if (i + 1) % 1000 == 0:
+            stop = time()
+            print(f'iteration={i+1}, elapsed={stop-start:.3f}, f_dual={f_val:.3f}, f_primal={f_primal_val:.3f}, f_unreg={unreg_f_val:.3f}')
+            start = time()
 
 
     info = {}
