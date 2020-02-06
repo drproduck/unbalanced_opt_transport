@@ -29,17 +29,17 @@ def get_L1_C(dim):
     return C
 
 def get_eta_k(eps, a, b, tau, nr):
-    alpha = sum(a)
-    beta = sum(b)
+    alpha = np.sum(a)
+    beta = np.sum(b)
     # S = (alpha + beta + 1 / np.log(nr)) * (2 * tau + 2)
     S = 0.5 * (alpha + beta) + 0.5 + 0.25 / np.log(nr)
     # T = 4 * ((alpha + beta) * (np.log(alpha + beta) + np.log(nr)) + 1)
     T = 0.5 * (alpha + beta) * (np.log(alpha + beta) - np.log(2) + np.log(nr) - 0.5) + np.log(nr) + 5/2
 
-    print('S, T:', S, T)
-
     U = np.max([S + T, 2 * eps, 4 * eps * np.log(nr) / tau, 4 * eps * (alpha+beta) * np.log(nr) / tau])
     eta = eps / U
+
+    print('S, T, U, eps, eta:', S, T, U, eps, eta)
 
     def supnorm(X):
         return np.max(np.abs(X))
@@ -47,7 +47,7 @@ def get_eta_k(eps, a, b, tau, nr):
     R = np.log(a).max() + np.log(b).max() + np.max([np.log(nr), supnorm(C) / eta - np.log(nr)])
     k = (tau * U / eps + 1) * (np.log(8) + np.log(eta) + np.log(R) + np.log(tau) + np.log(tau+1) + 3 * np.log(U) - 3 * np.log(eps))
 
-    return eta[0], k[0]
+    return eta, k
     
 C = get_L1_C(28).astype(np.float64)
 print(C)
@@ -55,6 +55,19 @@ print(C.sum())
 
 x, y = _load_mnist('.', split_type='train', download=True)
 pairs = ((3, 5), (20562, 12428), (2564, 12380), (48485, 7605), (26428, 42698), (6152, 25061), (13168, 7506), (40816, 39370), (846, 16727), (31169, 7144))
+opt_val_list = (
+321.83947656441, 
+167.64555073518932,
+207.3502556064093,
+423.35617236431176,
+117.52384257739209,
+459.297428039594,
+138.082535273433,
+256.3855206718765,
+221.13453306061183,
+348.8398254732447
+)
+
 
 #3 5
 #sum C: 11458944.0 sum a: 66.93428175 sum b: 115.62950225
@@ -107,41 +120,57 @@ pairs = ((3, 5), (20562, 12428), (2564, 12380), (48485, 7605), (26428, 42698), (
 #time elapsed: 527.7265672683716
 #exact val: 348.8398254732447
 
-for (id1, id2) in pairs:
+k_list_empirical_first = []
+k_list_formula = []
+
+eps_list = np.linspace(5.0, 0.5, 10)
+for (id1, id2), opt_val in zip(pairs, opt_val_list):
 	print(id1, id2)
 	a = x[id1].astype(np.float64)
 	b = x[id2].astype(np.float64)
-	# fig, ax = plt.subplots(1, 2)
-	# ax[0].imshow(a.reshape(28, 28))
-	# ax[0].set_title(y[id1])
-	# ax[1].imshow(b.reshape(28, 28))
-	# ax[1].set_title(y[id2])
+	# # fig, ax = plt.subplots(1, 2)
+	# # ax[0].imshow(a.reshape(28, 28))
+	# # ax[0].set_title(y[id1])
+	# # ax[1].imshow(b.reshape(28, 28))
+	# # ax[1].set_title(y[id2])
 	a = a.reshape(-1, 1)
 	b = b.reshape(-1, 1)
-	a[a == 0] = 1e-6
-	b[b == 0] = 1e-6
-
+	# a[a == 0] = 1e-6
+	# b[b == 0] = 1e-6
 	tau = 10
 	print('sum C:', C.sum(), 'sum a:', a.sum(), 'sum b:', b.sum())
 	print(C.dtype, a.dtype, b.dtype)
 
-	start = time()
-	uot_opt_val = exact_uot(C, a.flatten(), b.flatten(), tau)
-	print('time elapsed:', time() - start)
-	print('exact val:', uot_opt_val)
-	# time = 252s, opt_val = 305.794
+	# start = time()
+	# uot_opt_val = exact_uot(C, a.flatten(), b.flatten(), tau)
+	# print('time elapsed:', time() - start)
+	# print('exact val:', uot_opt_val)
+	# # time = 252s, opt_val = 305.794
 
-# start = time()
-# eps = 1.0
-# eta, k = get_eta_k(eps, a, b, tau, 784)
-# print('eta:', eta, 'k:', k)
-# eta = 0.001
-# u, v, info = sinkhorn_uot(C, a, b, eta=eta, t1=tau, t2=tau, n_iter=10000000, eps=eps, opt_val=305.794)
-# print('time elapsed:', time() - start)
-# # print(info['unreg_f_val_list'])
-#     
-# print('approx val:', info['unreg_f_val_list'][-1])
-# print(info['stop_iter'])
+	for eps in eps_list:
+		start = time()
+		eta, k = get_eta_k(eps, a, b, tau, 784)
+		k_list_empirical_first.append(k)
+		print('eps:', eps, 'eta:', eta, 'k:', k)
+		u, v, info = sinkhorn_uot(C, a, b, eta=eta, t1=tau, t2=tau, n_iter=10000000, eps=eps, opt_val=opt_val, vbo=True)
+		print('time elapsed:', time() - start)
+		# print(info['unreg_f_val_list'])
+			
+		print('approx val:', info['unreg_f_val_list'][-1])
+		print(info['stop_iter'])
+		k_list_formula.append(info['stop_iter'])
 
-# plt.show()
+k_list = np.array(k_list)
+plt.rcParams.update({'font.size': 22})
+plt.figure(figsize=(10, 8))
+# plt.plot(eps_list, [tmp / 1000 for tmp in k_list_empirical_true], "r", linewidth=4, label=r"$k_{true}$")
+plt.plot(eps_list, [tmp / 1000 for tmp in k_list_empirical_first], "g", linewidth=4, label=r"$k_{first}$")
+plt.plot(eps_list, [tmp / 1000 for tmp in k_list_formula], "b", linewidth=4, label=r"$k_{formula}$")
+plt.xlabel("epsilon")
+plt.ylabel("k (thousand iterations)")
+plt.legend(prop={'size': 30})
+
+plt.savefig('k_comparison.eps', bbox_inches='tight')
+plt.savefig('k_comparison.png', bbox_inches='tight')
+plt.show()
 
