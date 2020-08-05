@@ -4,17 +4,9 @@ def get_entropy(P):
     logP = np.log(P + 1e-20)
     return -1 * np.sum(logP * P - P)
 
-
 def get_KL(P, Q):
     log_ratio = np.log(P + 1e-20) - np.log(Q + 1e-20)
     return np.sum(P * log_ratio - P + Q)
-
-# def get_kl(B, a, axis):
-#     xB = B.sum(axis=axis).reshape(-1, 1)
-#     log_ratio = np.log(xB / a + 1e-20)
-#     ret = xB * log_ratio - xB + a
-#     return ret.sum()
-
 
 def dotp(x, y):
     return np.sum(x * y)
@@ -26,6 +18,9 @@ def supnorm(X):
     return np.max(np.abs(X))
 
 def round_rc(F, r, c):
+    """
+    matrix rounding. Taken from "Near-linear time approximation algorithms for OT via Sinkhorn iterations"
+    """
     rF = F.sum(axis=1).reshape(-1, 1)
     x = np.minimum(r / rF, 1)
     FF = F * x.reshape(-1, 1)

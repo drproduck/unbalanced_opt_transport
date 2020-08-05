@@ -8,6 +8,7 @@ from download_mnist import _load_mnist
 from prog import exact_uot
 from time import time
 
+import sys
 
 USE_PRESET_PAIRS = True
 # USE_PRECOMPUTED_OPTVAL = True
@@ -55,7 +56,8 @@ C = get_L1_C(28).astype(np.float64)
 # print(C)
 
 x, y = _load_mnist('.', split_type='train', download=True)
-pairs = ((3, 5), (20562, 12428), (2564, 12380), (48485, 7605), (26428, 42698), (6152, 25061), (13168, 7506), (40816, 39370), (846, 16727), (31169, 7144))
+# pairs = ((3, 5), (20562, 12428), (2564, 12380), (48485, 7605), (26428, 42698), (6152, 25061), (13168, 7506), (40816, 39370), (846, 16727), (31169, 7144))
+pairs = ((3, 5), )
 
 # pre-computed optimal values. Use this if you don't want to run again, or if you use other image pairs.
 # opt_val_list = (
@@ -79,30 +81,31 @@ eps_list = np.linspace(5.0, 0.5, 10)
 tau = 10
 
 for (id1, id2) in pairs:
-	print('pair', id1, id2)
-	a = x[id1].astype(np.float64)
-	b = x[id2].astype(np.float64)
-	a = a.reshape(-1, 1)
-	b = b.reshape(-1, 1)
-	a[a == 0] = 1e-6
-	b[b == 0] = 1e-6
+    print('pair', id1, id2)
+    a = x[id1].astype(np.float64)
+    b = x[id2].astype(np.float64)
+    a = a.reshape(-1, 1)
+    b = b.reshape(-1, 1)
+    a[a == 0] = 1e-6
+    b[b == 0] = 1e-6
 
-	start = time()
-	uot_opt_val = exact_uot(C, a.flatten(), b.flatten(), tau, vbo=True)
-	print('time elapsed:', time() - start)
-	print('exact val:', uot_opt_val)
+    # start = time()
+    # uot_opt_val = exact_uot(C, a.flatten(), b.flatten(), tau, vbo=True)
+    # print('time elapsed:', time() - start)
+    # print('exact val:', uot_opt_val)
 
-	for eps in eps_list:
-		start = time()
-		eta, k = get_eta_k(eps, a, b, tau, 784)
-		k_list_empirical_first.append(k)
-		print('eps:', eps, 'eta:', eta, 'k:', k)
-		u, v, info = sinkhorn_uot(C, a, b, eta=eta, t1=tau, t2=tau, n_iter=10000000, eps=eps, opt_val=uot_opt_val, vbo=True)
-		print('time elapsed:', time() - start)
-		print('approx val:', info['unreg_f_val_list'][-1])
-		print(info['stop_iter'])
-		k_list_formula.append(info['stop_iter'])
+    for eps in eps_list:
+        start = time()
+        eta, k = get_eta_k(eps, a, b, tau, 784)
+        k_list_empirical_first.append(k)
+        print('eps:', eps, 'eta:', eta, 'k:', k)
+        # u, v, info = sinkhorn_uot(C, a, b, eta=eta, t1=tau, t2=tau, n_iter=10000000, eps=eps, opt_val=uot_opt_val, vbo=True)
+        # print('time elapsed:', time() - start)
+        # print('approx val:', info['unreg_f_val_list'][-1])
+        # print(info['stop_iter'])
+        # k_list_formula.append(info['stop_iter'])
 
+sys.exit()
 k_list = np.array(k_list)
 plt.rcParams.update({'font.size': 22})
 plt.figure(figsize=(10, 8))
