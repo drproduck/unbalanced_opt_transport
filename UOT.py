@@ -33,7 +33,6 @@ def f_primal(unreg_f_val, B, eta):
     return unreg_f_val - eta * ent
 
 
-
 def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, eps=None, opt_val=None, save_uv=True):
     """
     :arg C: cost matrix

@@ -1,6 +1,4 @@
 import numpy as np
-from utils import *
-import numpy
 import torch
 from time import time
 
@@ -55,7 +53,7 @@ def f_primal(unreg_f_val, B, eta):
 
 
 
-def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, eps=None, opt_val=None):
+def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, eps=None, opt_val=None, vbo=False):
     """
     :arg C: cost matrix
     :arg r: first marginal
@@ -125,7 +123,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, eps=None, opt_val
             stop_iter = i + 1
             break
 
-        if (i + 1) % 1000 == 0:
+        if vbo and (i + 1) % 1000 == 0:
             stop = time()
             print(f'iteration={i+1}, elapsed={stop-start:.3f}, f_dual={f_val:.3f}, f_primal={f_primal_val:.3f}, f_unreg={unreg_f_val:.3f}')
             start = time()
