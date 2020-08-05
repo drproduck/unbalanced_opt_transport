@@ -1,7 +1,9 @@
 import numpy as np
 from utils import *
 from copy import copy
-import numpy
+import numpy 
+
+np.random.seed(999)
 
 def get_B(C, u, v, eta):
     n, m = C.shape
@@ -32,7 +34,7 @@ def f_primal(unreg_f_val, B, eta):
 
 
 
-def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, eps=None, opt_val=None, save_uv=False):
+def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, eps=None, opt_val=None, save_uv=True):
     """
     :arg C: cost matrix
     :arg r: first marginal
