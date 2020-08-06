@@ -2,6 +2,7 @@ import numpy as np
 from utils import *
 from copy import copy
 import numpy 
+from scipy.special import logsumexp
 
 np.random.seed(999)
 
@@ -130,4 +131,108 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
         info['stop_iter'] = stop_iter
     else: info['stop_iter'] = n_iter
 
-    return u, v, info 
+    return B, info 
+
+
+def grad_descent_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=100):
+
+    """
+    :arg C: cost matrix shape = [r_dim, c_dim]
+    :arg r: first marginal shape = [r_dim, 1]
+    :arg c: second marginal shape = [c_dim, 1]
+    :arg eta: entropic-regularizer
+    :arg t1: first KL regularizer
+    :arg t2: second Kl regularizer
+    :arg gamma: step size
+    :n_iter: number of Sinkhorn iterations
+    """
+    
+    X_list = []
+    unreg_f_val_list = []
+    f_primal_val_list = []
+
+    log_r = np.log(r)
+    log_c = np.log(c).reshape(1, -1)
+
+    X = np.exp(- C / eta)
+    unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+    f_primal_val = f_primal(unreg_f_val, X, eta)
+
+    X_list.append(X)
+    unreg_f_val_list.append(unreg_f_val)
+    f_primal_val_list.append(f_primal_val)
+    
+    for it in range(n_iter):
+        log_sum_r = np.log(X.sum(axis=-1, keepdims=True)) # [r_dim, 1]
+        log_sum_c = np.log(X.sum(axis=0, keepdims=True)) # [1, c_dim]
+        delta = C + t1 * log_sum_r + t2 * log_sum_c - t1 * log_r - t2 * log_c + eta * np.log(X)
+        
+        X = np.maximum(1e-100, X - gamma * delta)
+
+        unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+        f_primal_val = f_primal(unreg_f_val, X, eta)
+
+        X_list.append(X)
+        unreg_f_val_list.append(unreg_f_val)
+        f_primal_val_list.append(f_primal_val)
+
+    info = {'X_list': X_list,
+            'unreg_f_val_list': unreg_f_val_list,
+            'f_primal_val_list': f_primal_val_list}
+
+    return X, info
+    
+def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=100):
+
+    """
+    :arg C: cost matrix shape = [r_dim, c_dim]
+    :arg r: first marginal shape = [r_dim, 1]
+    :arg c: second marginal shape = [c_dim, 1]
+    :arg eta: entropic-regularizer
+    :arg t1: first KL regularizer
+    :arg t2: second Kl regularizer
+    :arg gamma: step size
+    :n_iter: number of Sinkhorn iterations
+    """
+    
+    X_list = []
+    unreg_f_val_list = []
+    f_primal_val_list = []
+
+    log_r = np.log(r)
+    log_c = np.log(c).reshape(1, -1)
+
+    # log_X = - C / eta
+    log_X = np.random.randn(*C.shape)
+    X = np.exp(log_X)
+    unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+    f_primal_val = f_primal(unreg_f_val, X, eta)
+
+    X_list.append(X)
+    unreg_f_val_list.append(unreg_f_val)
+    f_primal_val_list.append(f_primal_val)
+    
+    for it in range(n_iter):
+        lse_r = logsumexp(log_X, axis=-1, keepdims=True) # [r_dim, 1]
+        lse_c = logsumexp(log_X, axis=0, keepdims=True) # [1, c_dim]
+        dklr = (lse_r - log_r)
+        dklc = (lse_c - log_c)
+        dh = log_X
+        delta = (C + t1 * dklr + t2 * dklc + eta * dh) * X
+        log_X = log_X - gamma * delta 
+
+        X = np.exp(log_X)
+        unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+        f_primal_val = f_primal(unreg_f_val, X, eta)
+
+        X_list.append(X)
+        unreg_f_val_list.append(unreg_f_val)
+        f_primal_val_list.append(f_primal_val)
+
+    info = {'X_list': X_list,
+            'unreg_f_val_list': unreg_f_val_list,
+            'f_primal_val_list': f_primal_val_list}
+
+    return X, info
+    
+
