@@ -368,6 +368,7 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
             X = X_hat
         else:
             X = X - alpha * delta
+            X[X < 0] = 0
 
         unreg_f_val = unreg_f(X, C, r, c, t1, t2)
 
