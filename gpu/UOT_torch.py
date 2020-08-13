@@ -38,7 +38,7 @@ def f_dual(B, u, v, r, c, eta, t1, t2):
     return f
 
 
-def unreg_f(B, C, r, c, eta, t1, t2):
+def unreg_f(B, C, r, c, t1, t2):
     """
     the unregularized objective with solutions u, v
     """
@@ -84,7 +84,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, eps=None, opt_val
     f_val = f_dual(B, u, v, r, c, eta, t1, t2)
     f_val_list.append(f_val)
 
-    unreg_f_val = unreg_f(B, C, r, c, eta, t1, t2)
+    unreg_f_val = unreg_f(B, C, r, c, t1, t2)
     unreg_f_val_list.append(unreg_f_val)
 
     f_primal_val = f_primal(unreg_f_val, B, eta)
@@ -110,7 +110,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, eps=None, opt_val
         f_val = f_dual(B, u, v, r, c, eta, t1, t2)
         f_val_list.append(f_val)
 
-        unreg_f_val = unreg_f(B, C, r, c, eta, t1, t2)
+        unreg_f_val = unreg_f(B, C, r, c, t1, t2)
         unreg_f_val_list.append(unreg_f_val)
 
         f_primal_val = f_primal(unreg_f_val, B, eta)
@@ -137,3 +137,61 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, eps=None, opt_val
     info['stop_iter'] = stop_iter
 
     return u, v, info
+
+
+def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=100):
+
+    """
+    :arg C: cost matrix shape = [r_dim, c_dim]
+    :arg r: first marginal shape = [r_dim, 1]
+    :arg c: second marginal shape = [c_dim, 1]
+    :arg eta: entropic-regularizer
+    :arg t1: first KL regularizer
+    :arg t2: second Kl regularizer
+    :arg gamma: step size
+    :n_iter: number of Sinkhorn iterations
+    """
+
+    C = torch.from_numpy(C).type(torch.float32).cuda()
+    r = torch.from_numpy(r).type(torch.float32).cuda()
+    c = torch.from_numpy(c).type(torch.float32).cuda()
+    
+    X_list = []
+    unreg_f_val_list = []
+    f_primal_val_list = []
+    grad_norm_list = []
+
+    log_r = torch.log(r)
+    log_c = torch.log(c).reshape(1, -1)
+
+    # log_X = - C / eta
+    log_X = torch.randn_like(C).cuda()
+    log_X.requires_grad = True
+    X = torch.exp(log_X)
+
+    optimizer = torch.optim.Adam([log_X], lr=gamma)
+
+    
+    for it in range(n_iter):
+        unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+        f_primal_val = f_primal(unreg_f_val, X, eta)
+        optimizer.zero_grad()
+        f_primal_val.backward()
+        optimizer.step()
+
+        X = torch.exp(log_X)
+        grad_norm = log_X.grad.data.norm(2).item()
+
+        X_list.append(X.detach().cpu().numpy())
+        unreg_f_val_list.append(unreg_f_val.item())
+        f_primal_val_list.append(f_primal_val.item())
+        grad_norm_list.append(grad_norm)
+
+
+    info = {'X_list': X_list,
+            'unreg_f_val_list': unreg_f_val_list,
+            'f_primal_val_list': f_primal_val_list,
+            'grad_norm_list': grad_norm_list,
+            }
+
+    return X.detach().cpu().numpy(), info

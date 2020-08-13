@@ -3,6 +3,8 @@ from utils import *
 from copy import copy
 import numpy 
 from scipy.special import logsumexp
+from functools import partial
+import pdb
 
 np.random.seed(999)
 
@@ -20,7 +22,7 @@ def f_dual(B, u, v, r, c, eta, t1, t2):
     return f
 
 
-def unreg_f(B, C, r, c, eta, t1, t2):
+def unreg_f(B, C, r, c, t1, t2):
     """
     the unregularized objective with solutions u, v
     """
@@ -67,7 +69,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
     f_val = f_dual(B, u, v, r, c, eta, t1, t2)
     f_val_list.append(f_val)
 
-    unreg_f_val = unreg_f(B, C, r, c, eta, t1, t2)
+    unreg_f_val = unreg_f(B, C, r, c, t1, t2)
     unreg_f_val_list.append(unreg_f_val)
 
     f_primal_val = f_primal(unreg_f_val, B, eta)
@@ -99,7 +101,7 @@ def sinkhorn_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, early_stop=True, 
         f_val = f_dual(B, u, v, r, c, eta, t1, t2)
         f_val_list.append(f_val)
 
-        unreg_f_val = unreg_f(B, C, r, c, eta, t1, t2)
+        unreg_f_val = unreg_f(B, C, r, c, t1, t2)
         unreg_f_val_list.append(unreg_f_val)
 
         f_primal_val = f_primal(unreg_f_val, B, eta)
@@ -150,12 +152,13 @@ def grad_descent_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=100):
     X_list = []
     unreg_f_val_list = []
     f_primal_val_list = []
+    grad_norm_list = []
 
     log_r = np.log(r)
     log_c = np.log(c).reshape(1, -1)
 
-    X = np.exp(- C / eta)
-    unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+    X = np.random.rand(*C.shape)
+    unreg_f_val = unreg_f(X, C, r, c, t1, t2)
     f_primal_val = f_primal(unreg_f_val, X, eta)
 
     X_list.append(X)
@@ -166,19 +169,96 @@ def grad_descent_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=100):
         log_sum_r = np.log(X.sum(axis=-1, keepdims=True)) # [r_dim, 1]
         log_sum_c = np.log(X.sum(axis=0, keepdims=True)) # [1, c_dim]
         delta = C + t1 * log_sum_r + t2 * log_sum_c - t1 * log_r - t2 * log_c + eta * np.log(X)
-        
-        X = np.maximum(1e-100, X - gamma * delta)
 
-        unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+        delta[~ np.isfinite(delta)] = 0
+        
+        X = X - gamma * delta
+        X[X < 0] = 0
+
+        unreg_f_val = unreg_f(X, C, r, c, t1, t2)
         f_primal_val = f_primal(unreg_f_val, X, eta)
 
         X_list.append(X)
         unreg_f_val_list.append(unreg_f_val)
         f_primal_val_list.append(f_primal_val)
+        grad_norm_list.append(normfro(delta))
 
     info = {'X_list': X_list,
             'unreg_f_val_list': unreg_f_val_list,
-            'f_primal_val_list': f_primal_val_list}
+            'f_primal_val_list': f_primal_val_list,
+            'grad_norm_list': grad_norm_list,
+            }
+
+    return X, info
+
+
+def backtracking_linesearch(eval_func, x, delta, alpha, beta):
+    f = eval_func(x)
+    x_hat = x - alpha * delta
+    f_hat = eval_func(x_hat)
+    # print(f_hat, f)
+    while np.sum(x_hat < 0) > 0 or not f_hat <= f - alpha * beta * np.sum(delta**2):
+        alpha /= 2
+        if alpha < 1e-10: break
+        x_hat = x - alpha * delta
+        f_hat = eval_func(x_hat)
+        # print(f_hat, f)
+    return f_hat, x_hat, alpha
+
+
+def grad_descent_uot_with_linesearch(C, r, c, eta=1.0, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.1):
+
+    """
+    :arg C: cost matrix shape = [r_dim, c_dim]
+    :arg r: first marginal shape = [r_dim, 1]
+    :arg c: second marginal shape = [c_dim, 1]
+    :arg eta: entropic-regularizer
+    :arg t1: first KL regularizer
+    :arg t2: second Kl regularizer
+    :arg gamma: step size
+    :n_iter: number of Sinkhorn iterations
+    """
+
+
+    unreg_f_val_func = partial(unreg_f, C=C, r=r, c=c, eta=eta, t1=t1, t2=t2)
+
+    
+    X_list = []
+    unreg_f_val_list = []
+    f_primal_val_list = []
+    grad_norm_list = []
+
+    log_r = np.log(r)
+    log_c = np.log(c).reshape(1, -1)
+
+    # X = np.exp(- C / eta)
+    X = np.random.rand(*C.shape)
+    unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+    f_primal_val = f_primal(unreg_f_val, X, eta)
+
+    X_list.append(X)
+    unreg_f_val_list.append(unreg_f_val)
+    f_primal_val_list.append(f_primal_val)
+
+    
+    for it in range(n_iter):
+        log_sum_r = np.log(X.sum(axis=-1, keepdims=True)) # [r_dim, 1]
+        log_sum_c = np.log(X.sum(axis=0, keepdims=True)) # [1, c_dim]
+        delta = C + t1 * log_sum_r + t2 * log_sum_c - t1 * log_r - t2 * log_c + eta * np.log(X)
+        
+        unreg_f_val, X, alpha_hat = backtracking_linesearch(unreg_f_val_func, X, delta, alpha, beta)
+        f_primal_val = f_primal(unreg_f_val, X, eta)
+
+        X_list.append(X)
+        unreg_f_val_list.append(unreg_f_val)
+        f_primal_val_list.append(f_primal_val)
+        grad_norm_list.append(normfro(delta))
+
+    info = {'X_list': X_list,
+            'unreg_f_val_list': unreg_f_val_list,
+            'f_primal_val_list': f_primal_val_list,
+            'grad_norm_list': grad_norm_list,
+            }
 
     return X, info
     
@@ -198,6 +278,7 @@ def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=10
     X_list = []
     unreg_f_val_list = []
     f_primal_val_list = []
+    grad_norm_list = []
 
     log_r = np.log(r)
     log_c = np.log(c).reshape(1, -1)
@@ -205,7 +286,7 @@ def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=10
     # log_X = - C / eta
     log_X = np.random.randn(*C.shape)
     X = np.exp(log_X)
-    unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+    unreg_f_val = unreg_f(X, C, r, c, t1, t2)
     f_primal_val = f_primal(unreg_f_val, X, eta)
 
     X_list.append(X)
@@ -222,17 +303,81 @@ def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=10
         log_X = log_X - gamma * delta 
 
         X = np.exp(log_X)
-        unreg_f_val = unreg_f(X, C, r, c, eta, t1, t2)
+        unreg_f_val = unreg_f(X, C, r, c, t1, t2)
         f_primal_val = f_primal(unreg_f_val, X, eta)
 
         X_list.append(X)
         unreg_f_val_list.append(unreg_f_val)
         f_primal_val_list.append(f_primal_val)
+        grad_norm_list.append(normfro(delta))
 
     info = {'X_list': X_list,
             'unreg_f_val_list': unreg_f_val_list,
-            'f_primal_val_list': f_primal_val_list}
+            'f_primal_val_list': f_primal_val_list,
+            'grad_norm_list': grad_norm_list,
+            }
 
     return X, info
-    
 
+
+    
+def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5):
+
+    """
+    :arg C: cost matrix shape = [r_dim, c_dim]
+    :arg r: first marginal shape = [r_dim, 1]
+    :arg c: second marginal shape = [c_dim, 1]
+    :arg t1: first KL regularizer
+    :arg t2: second Kl regularizer
+    :arg gamma: step size
+    :n_iter: number of Sinkhorn iterations
+    """
+
+    X_list = []
+    unreg_f_val_list = []
+    f_primal_val_list = []
+    grad_norm_list = []
+
+    log_r = np.log(r)
+    log_c = np.log(c).reshape(1, -1)
+
+    X = np.random.rand(*C.shape)
+    unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+
+    X_list.append(X)
+    unreg_f_val_list.append(unreg_f_val)
+    
+    for it in range(n_iter):
+        log_sum_r = np.log(X.sum(axis=-1, keepdims=True)) # [r_dim, 1]
+        log_sum_c = np.log(X.sum(axis=0, keepdims=True)) # [1, c_dim]
+        delta = C + t1 * log_sum_r + t2 * log_sum_c - t1 * log_r - t2 * log_c
+
+        # backtracking line search
+        f = unreg_f_val_list[-1]
+        X_hat = X - alpha * delta
+        X_hat[X_hat < 0] = 0
+        f_hat = unreg_f(X_hat, C, r, c, t1, t2)
+        while not np.isfinite(f) or not f_hat <= f - alpha * beta * np.sum(delta**2):
+            alpha /= 2
+            X_hat = X - alpha * delta
+            X_hat[X_hat < 0] = 0
+            f_hat = unreg_f(X_hat, C, r, c, t1, t2)
+
+        X = X_hat
+
+        unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+
+        X_list.append(X)
+        unreg_f_val_list.append(unreg_f_val)
+        grad_norm_list.append(normfro(delta))
+
+    info = {'X_list': X_list,
+            'unreg_f_val_list': unreg_f_val_list,
+            'grad_norm_list': grad_norm_list,
+            }
+
+    return X, info
+
+# def sparse_uot(C, r, c, eta=0.01, t1=1.0, t2=1.0, gamma=0.01, n_iter=100, n_sample=1):
+    
+    

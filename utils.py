@@ -17,6 +17,9 @@ def norm1(X):
 def supnorm(X):
     return np.max(np.abs(X))
 
+def normfro(X):
+    return np.sqrt(np.sum(X**2))
+
 def round_rc(F, r, c):
     """
     matrix rounding. Taken from "Near-linear time approximation algorithms for OT via Sinkhorn iterations"
