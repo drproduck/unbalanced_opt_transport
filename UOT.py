@@ -321,7 +321,7 @@ def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=10
 
 
     
-def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5):
+def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5, linesearch=False):
 
     """
     :arg C: cost matrix shape = [r_dim, c_dim]
@@ -329,7 +329,8 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
     :arg c: second marginal shape = [c_dim, 1]
     :arg t1: first KL regularizer
     :arg t2: second Kl regularizer
-    :arg gamma: step size
+    :arg alpha: (initial) step size. Should set high for linesearch, low for fixed
+    arg beta: see armijo rule
     :n_iter: number of Sinkhorn iterations
     """
 
@@ -352,18 +353,21 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
         log_sum_c = np.log(X.sum(axis=0, keepdims=True)) # [1, c_dim]
         delta = C + t1 * log_sum_r + t2 * log_sum_c - t1 * log_r - t2 * log_c
 
-        # backtracking line search
-        f = unreg_f_val_list[-1]
-        X_hat = X - alpha * delta
-        X_hat[X_hat < 0] = 0
-        f_hat = unreg_f(X_hat, C, r, c, t1, t2)
-        while not np.isfinite(f) or not f_hat <= f - alpha * beta * np.sum(delta**2):
-            alpha /= 2
+        if linesearch:
+            # backtracking line search
+            f = unreg_f_val_list[-1]
             X_hat = X - alpha * delta
             X_hat[X_hat < 0] = 0
             f_hat = unreg_f(X_hat, C, r, c, t1, t2)
+            while not np.isfinite(f_hat) or not f_hat <= f - alpha * beta * np.sum(delta**2):
+                alpha /= 2
+                X_hat = X - alpha * delta
+                X_hat[X_hat < 0] = 0
+                f_hat = unreg_f(X_hat, C, r, c, t1, t2)
 
-        X = X_hat
+            X = X_hat
+        else:
+            X = X - alpha * delta
 
         unreg_f_val = unreg_f(X, C, r, c, t1, t2)
 
