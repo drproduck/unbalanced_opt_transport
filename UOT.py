@@ -321,7 +321,7 @@ def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=10
 
 
     
-def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5, linesearch=False):
+def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5, linesearch=False, subset=None):
 
     """
     :arg C: cost matrix shape = [r_dim, c_dim]
@@ -330,9 +330,21 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
     :arg t1: first KL regularizer
     :arg t2: second Kl regularizer
     :arg alpha: (initial) step size. Should set high for linesearch, low for fixed
-    arg beta: see armijo rule
-    :n_iter: number of Sinkhorn iterations
+    :arg beta: see armijo rule
+    :arg n_iter: number of Sinkhorn iterations
+    :arg linesearch:
+    :arg subset: the subset of X to update
     """
+
+    def update_subset(X, detla, subset):
+        if subset is None:
+            X_hat = X - alpha * delta
+        else:
+            X_hat = np.zeros_like(C)
+            X_hat[subset] = X[subset] - alpha * delta[subset]
+        X_hat[X_hat < 0] = 1e-100
+
+        return X_hat
 
     X_list = []
     unreg_f_val_list = []
@@ -342,7 +354,8 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
     log_r = np.log(r)
     log_c = np.log(c).reshape(1, -1)
 
-    X = np.random.rand(*C.shape)
+    # X = np.random.rand(*C.shape)
+    X = np.exp(- C)
     unreg_f_val = unreg_f(X, C, r, c, t1, t2)
 
     X_list.append(X)
@@ -356,19 +369,16 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
         if linesearch:
             # backtracking line search
             f = unreg_f_val_list[-1]
-            X_hat = X - alpha * delta
-            X_hat[X_hat < 0] = 0
+            X_hat = update_subset(X, delta, subset)
             f_hat = unreg_f(X_hat, C, r, c, t1, t2)
-            while not np.isfinite(f_hat) or not f_hat <= f - alpha * beta * np.sum(delta**2):
+            while (not np.isfinite(f_hat)) or (not f_hat <= f - alpha * beta * np.sum(delta**2)):
                 alpha /= 2
-                X_hat = X - alpha * delta
-                X_hat[X_hat < 0] = 0
+                X_hat = update_subset(X, delta, subset)
                 f_hat = unreg_f(X_hat, C, r, c, t1, t2)
 
             X = X_hat
         else:
-            X = X - alpha * delta
-            X[X < 0] = 0
+            X = update_subset(X, delta, subset)
 
         unreg_f_val = unreg_f(X, C, r, c, t1, t2)
 
@@ -383,6 +393,31 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
 
     return X, info
 
-# def sparse_uot(C, r, c, eta=0.01, t1=1.0, t2=1.0, gamma=0.01, n_iter=100, n_sample=1):
-    
-    
+
+def sigmoid(phi):
+    return 1. / (1 + np.exp(- phi))
+
+
+def sparse_uot(C, r, c, eta=0.01, t1=1.0, t2=1.0, gamma=1., alpha=1e-3, n_sample=1, n_iter=100, subprob_args=None):
+
+    if subprob_args is None:
+        subprob_args = {'alpha':1e-3, 'beta':1e-6, 'n_iter':1000, 'linesearch': False}
+
+    phi = np.random.randn(*C.shape)
+    for it in range(n_iter):
+        delta = 0.
+        for _ in range(n_sample):
+            u = np.random.rand(*C.shape) # uniform
+            index_more = (u > sigmoid(-phi))
+            index_less  = (u < sigmoid(phi))
+            f_more = grad_descent_unregularized_uot(C, r, c, t1, t2, **subprob_args, subset=index_more)[1]['unreg_f_val_list'][-1] + gamma * np.sum(index_more)
+            f_less = grad_descent_unregularized_uot(C, r, c, t1, t2, **subprob_args, subset=index_less)[1]['unreg_f_val_list'][-1] + gamma * np.sum(index_less)
+            # delta += (f_more - f_less) * (u - 0.5)
+            delta += 0.5 * (f_more - f_less) * sigmoid(np.abs(phi)) * (index_more.astype(np.float) - index_less.astype(np.float))
+            print(f_more, f_less)
+
+        delta = delta / n_sample
+
+        phi = phi - alpha * delta
+
+    return sigmoid(phi), None

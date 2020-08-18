@@ -45,7 +45,7 @@ print('gradient descent GPU time elapsed:', time() - start)
 
 
 start = time()
-X_u, info_u = grad_descent_unregularized_uot(C, r, c, t1=10, t2=10, n_iter=n_iter, alpha=1e-3, beta=1e-6)
+X_u, info_u = grad_descent_unregularized_uot(C, r, c, t1=10, t2=10, n_iter=n_iter, alpha=1e-3, beta=1e-6, linesearch=False)
 print(np.argmax(X_u, axis=-1))
 print('gradient descent unregularized time elapsed:', time() - start)
 
