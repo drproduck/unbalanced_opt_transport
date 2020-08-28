@@ -321,7 +321,7 @@ def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=10
 
 
     
-def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5, linesearch=False, subset=None):
+def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5, linesearch=False, subset=None, nesterov=True):
 
     """
     :arg C: cost matrix shape = [r_dim, c_dim]
@@ -398,14 +398,19 @@ def sigmoid(phi):
     return 1. / (1 + np.exp(- phi))
 
 
-def sparse_uot(C, r, c, eta=0.01, t1=1.0, t2=1.0, gamma=1., alpha=1e-3, n_sample=1, n_iter=100, subprob_args=None):
+def sparse_uot(C, r, c, eta=0.01, t1=1.0, t2=1.0, gamma=1., alpha=1e-3, n_sample=1, n_iter=100, subprob_args=None, vb=True):
 
     if subprob_args is None:
         subprob_args = {'alpha':1e-3, 'beta':1e-6, 'n_iter':1000, 'linesearch': False}
 
+    grad_norm_list = []
+    rand_f_list = []
+    phi_list = []
+
     phi = np.random.randn(*C.shape)
     for it in range(n_iter):
         delta = 0.
+        rand_f = 0
         for _ in range(n_sample):
             u = np.random.rand(*C.shape) # uniform
             index_more = (u > sigmoid(-phi))
@@ -414,10 +419,28 @@ def sparse_uot(C, r, c, eta=0.01, t1=1.0, t2=1.0, gamma=1., alpha=1e-3, n_sample
             f_less = grad_descent_unregularized_uot(C, r, c, t1, t2, **subprob_args, subset=index_less)[1]['unreg_f_val_list'][-1] + gamma * np.sum(index_less)
             # delta += (f_more - f_less) * (u - 0.5)
             delta += 0.5 * (f_more - f_less) * sigmoid(np.abs(phi)) * (index_more.astype(np.float) - index_less.astype(np.float))
-            print(f_more, f_less)
+
+            rand_f += f_less
 
         delta = delta / n_sample
+        rand_f = rand_f / n_sample
 
         phi = phi - alpha * delta
 
-    return sigmoid(phi), None
+        grad_norm = np.sqrt(np.sum(delta**2))
+
+        grad_norm_list.append(grad_norm)
+        rand_f_list.append(rand_f)
+        phi_list.append(sigmoid(phi))
+
+        if vb and it % 10 == 0:
+            print(f'it {it}, grad_norm={grad_norm:.3f}')
+
+
+
+    info = {'grad_norm_list': grad_norm_list,
+            'rand_f_list': rand_f_list,
+            'phi_list': phi_list,
+            }
+
+    return sigmoid(phi), info

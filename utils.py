@@ -36,3 +36,44 @@ def round_rc(F, r, c):
     G = FFF + err_r @ err_c.T / norm1(err_r)
 
     return G
+
+class BaseGradDescent():
+    def __init__(self, lr):
+        self.lr = lr
+        
+
+    def update(self):
+        raise NotImplementedError
+
+
+class VanillaGradDescent(BaseGradDescent):
+    def __init__(self, lr):
+        super().__init__(lr)
+
+    def update(x, delta):
+        return x - self.lr * delta
+
+
+class NesterovGradDescent(BaseGradDescent):
+    def __init__(self, lr):
+        super().__init__(lr)
+        self.lmd = 0
+        self.old_y = None
+
+    def update(x, delta, subset=None):
+        new_lmd = (1 + np.sqrt(1 + 4 * self.lmd ** 2)) / 2
+        gamma = (1 - self.lmd) / new_lmd
+        self.lmd = new_lmd
+
+        y = x - self.lr * delta
+        if self.old_y is None:
+            x = (1 - gamma) * y + gamma * x
+        else:
+            x = (1 - gamma) * y + gamma * self.old_y
+        self.old_y = y
+
+        return x
+
+
+# class BacktrackGradDescent(BaseGradDescent):
+#     def __init__(self, lr):
