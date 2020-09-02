@@ -321,7 +321,7 @@ def grad_descent_exp_uot(C, r, c, eta=1.0, t1=1.0, t2=1.0, gamma=0.01, n_iter=10
 
 
     
-def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5, linesearch=False, subset=None, nesterov=True):
+def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.1, beta=0.5, subset=None, linesearch=False):
 
     """
     :arg C: cost matrix shape = [r_dim, c_dim]
@@ -396,6 +396,117 @@ def grad_descent_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, alpha=0.
 
 def sigmoid(phi):
     return 1. / (1 + np.exp(- phi))
+
+
+def nesterov_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, lr=0.1, subset=None):
+
+    """
+    :arg C: cost matrix shape = [r_dim, c_dim]
+    :arg r: first marginal shape = [r_dim, 1]
+    :arg c: second marginal shape = [c_dim, 1]
+    :arg t1: first KL regularizer
+    :arg t2: second Kl regularizer
+    :arg lr: step size.
+    :arg n_iter: number of Sinkhorn iterations
+    :arg linesearch:
+    :arg subset: the subset of X to update
+    """
+
+    updater = NesterovGradDescent(lr)
+
+    def update_subset(X, delta, subset):
+        if subset is None:
+            X_hat = updater.update(X, delta)
+            X_hat[X_hat < 0] = 1e-100
+        else:
+            X_hat_subset = updater.update(X[subset], delta[subset])
+            X_hat_subset[X_hat_subset < 0] = 1e-100
+            X_hat = np.zeros_like(C)
+            X_hat[subset] = X_hat_subset
+
+        return X_hat
+
+    X_list = []
+    unreg_f_val_list = []
+    f_primal_val_list = []
+    grad_norm_list = []
+
+    log_r = np.log(r)
+    log_c = np.log(c).reshape(1, -1)
+
+    X = np.random.rand(*C.shape)
+    unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+
+    X_list.append(X)
+    unreg_f_val_list.append(unreg_f_val)
+    
+    for it in range(n_iter):
+        log_sum_r = np.log(X.sum(axis=-1, keepdims=True)) # [r_dim, 1]
+        log_sum_c = np.log(X.sum(axis=0, keepdims=True)) # [1, c_dim]
+        delta = C + t1 * log_sum_r + t2 * log_sum_c - t1 * log_r - t2 * log_c
+        
+        #TODO missing update here
+
+        unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+
+        X_list.append(X)
+        unreg_f_val_list.append(unreg_f_val)
+        grad_norm_list.append(normfro(delta))
+
+    info = {'X_list': X_list,
+            'unreg_f_val_list': unreg_f_val_list,
+            'grad_norm_list': grad_norm_list,
+            }
+
+    return X, info
+
+
+def conditional_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100):
+
+    X_list = []
+    unreg_f_val_list = []
+    grad_norm_list = []
+
+    log_r = np.log(r)
+    log_c = np.log(c).reshape(1, -1)
+
+    # X = np.random.rand(*C.shape)
+    mu = np.sqrt(np.sum(r) * np.sum(c))
+    X = np.ones(C.shape) * mu / C.size
+
+    unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+
+    X_list.append(X)
+    unreg_f_val_list.append(unreg_f_val)
+
+    
+    for it in range(n_iter):
+        tau = 2 / (it + 3)
+        log_sum_r = np.log(X.sum(axis=-1, keepdims=True)) # [r_dim, 1]
+        log_sum_c = np.log(X.sum(axis=0, keepdims=True)) # [1, c_dim]
+        delta = C + t1 * log_sum_r + t2 * log_sum_c - t1 * log_r - t2 * log_c
+
+        min_indx = np.unravel_index(np.argmin(delta), delta.shape)
+        if delta[min_indx] >= 0:
+            X = (1 - tau) * X
+        else:
+            V = np.zeros(delta.shape)
+            V[min_indx] = mu
+            X = (1 - tau) * X + tau * V
+        
+        unreg_f_val = unreg_f(X, C, r, c, t1, t2)
+
+        X_list.append(X)
+        unreg_f_val_list.append(unreg_f_val)
+        grad_norm_list.append(normfro(delta))
+
+    info = {'X_list': X_list,
+            'unreg_f_val_list': unreg_f_val_list,
+            'grad_norm_list': grad_norm_list,
+            }
+
+    return X, info
+    
 
 
 def sparse_uot(C, r, c, eta=0.01, t1=1.0, t2=1.0, gamma=1., alpha=1e-3, n_sample=1, n_iter=100, subprob_args=None, vb=True):

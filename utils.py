@@ -1,4 +1,5 @@
 import numpy as np
+import pdb
 
 def get_entropy(P):
     logP = np.log(P + 1e-20)
@@ -50,7 +51,8 @@ class VanillaGradDescent(BaseGradDescent):
     def __init__(self, lr):
         super().__init__(lr)
 
-    def update(x, delta):
+
+    def update(self, x, delta):
         return x - self.lr * delta
 
 
@@ -58,22 +60,41 @@ class NesterovGradDescent(BaseGradDescent):
     def __init__(self, lr):
         super().__init__(lr)
         self.lmd = 0
-        self.old_y = None
+        self.y_old = None
 
-    def update(x, delta, subset=None):
-        new_lmd = (1 + np.sqrt(1 + 4 * self.lmd ** 2)) / 2
-        gamma = (1 - self.lmd) / new_lmd
-        self.lmd = new_lmd
+    def update(self, x, delta):
+        lmd_1 = (1 + np.sqrt(1 + 4 * self.lmd ** 2)) / 2
+        lmd_2 = (1 + np.sqrt(1 + 4 * lmd_1 ** 2)) / 2
+        gamma = (1 - lmd_1) / lmd_2
+        print(gamma)
+        self.lmd = lmd_1
 
         y = x - self.lr * delta
-        if self.old_y is None:
+        if self.y_old is None:
             x = (1 - gamma) * y + gamma * x
         else:
-            x = (1 - gamma) * y + gamma * self.old_y
-        self.old_y = y
+            x = (1 - gamma) * y + gamma * self.y_old
+        self.y_old = y
 
         return x
 
 
-# class BacktrackGradDescent(BaseGradDescent):
-#     def __init__(self, lr):
+class BacktrackGradDescent(BaseGradDescent):
+    def __init__(self, lr, beta, eval_func, update_func):
+        super().__init__(lr)
+        self.beta = beta
+        self.eval_func = eval_func
+        self.update_func = update_func
+
+
+    def update(self, x_old, delta, f_old):
+        alpha = self.lr
+        x_new = self.update_func(x_old, delta)
+        f_new = self.eval_func(x_new)
+        while (not np.isfinite(f_new)) or (not f_new <= f_old - alpha * self.beta * np.sum(delta**2)):
+            alpha /= 2
+            x_new = self.update_func(x_old, delta)
+            f_new = self.eval_func(x_new)
+
+        return x_new, f_new
+
