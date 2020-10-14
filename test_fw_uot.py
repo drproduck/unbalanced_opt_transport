@@ -8,8 +8,9 @@ from gpu import UOT_torch as gpu
 
 
 np.random.seed(999)
-nr = 200 nc = 200
-n_iter = 5000
+nr = 100 
+nc = 100
+n_iter = 20000
 C = np.random.uniform(low=1, high=10, size=(nr, nc))
 C = (C + C.T) / 2
 r = np.random.uniform(low=0.1, high=1, size=(nr, 1))
@@ -17,7 +18,7 @@ r = np.random.uniform(low=0.1, high=1, size=(nr, 1))
 c = np.random.uniform(low=0.1, high=1, size=(nc, 1))
 
 start = time()
-X_sh, info_sh = sinkhorn_uot(C, r, c, eta=0.01, t1=10, t2=10, n_iter=n_iter, early_stop=False)
+X_sh, info_sh = sinkhorn_uot(C, r, c, eta=0.1, t1=10, t2=10, n_iter=n_iter, early_stop=False)
 print(np.argmax(X_sh, axis=-1))
 print('sinkhorn time elapsed:', time() - start)
 
