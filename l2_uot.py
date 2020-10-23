@@ -20,6 +20,14 @@ def fval(C, a, b, tau, X):
     r, c = C.shape
     return np.sum(C * X) + tau / 2 * norm2sq(X - np.ones((r, 1)) @ b.T)
 
+def fdual(C, a, b, tau, X):
+    beta = - tau * (X.T.sum(axis=-1, keepdims=True) - b)
+    alpha = np.max(C - beta.T, axis=-1, keepdims=True)
+    pdb.set_trace()
+    d = np.sum(a * alpha) + np.sum(b * beta) - 1. / (2 * tau) * norm2sq(beta)
+
+    return d
+
 
 def grad(C, b, X, tau):
     """
@@ -50,7 +58,7 @@ def fista(C, a, b, tau, n_iter=100, X=None):
     Xs = []
     Gs = []
     if X is None:
-        X = np.random.rand(*C.shape)
+        X = np.random.rand(*C.shape) + 1e-2
         X = projection_simplex(X, a.flatten(), axis=1)
     t = 1.
     Y = copy(X)
@@ -63,6 +71,7 @@ def fista(C, a, b, tau, n_iter=100, X=None):
         
         t = tt
         X = copy(XX)
+        
         Xs.append(X)
         Gs.append(G)
 
@@ -80,7 +89,6 @@ def gd(C, a, b, tau, gamma=0.1, n_iter=100, X=None):
         G = grad(C, b, X, tau)
         X = X - gamma * G
         X = projection_simplex(X, a.flatten(), axis=1)
-
         Xs.append(X)
         Gs.append(G)
 
@@ -100,28 +108,39 @@ def exact(C, a, b, tau):
 
 if __name__ == '__main__':
     np.random.seed(0)
-    a = np.random.rand(20,1)
-    b = np.random.rand(50,1)
-    C = np.random.rand(20,50)
+    a = np.random.rand(100,1)
+    a = a / a.sum()
+    b = np.random.rand(200,1)
+    b = b / b.sum()
+    C = np.random.rand(100,200)
+    C = C / C.max()
     # C = (C + C.T) / 2
-    tau = 1000
-    n_iter = 2000
+    tau = 1.
+    n_iter = 10
     X, Xs, Gs = fista(C, a, b, tau, n_iter=n_iter)
     fs = [fval(C, a, b, tau, X) for X in Xs]
+    fds = [fdual(C, a, b, tau, X) for X in Xs]
     # print(f'fista: f={fs[-1]:.3f}, X={X}')
     print(fs[-1])
     gnorms = [sqrt(norm2sq(G)) for G in Gs]
     fig, ax = plt.subplots(2, 2)
     ax[0,0].plot(np.arange(n_iter+1), fs)
+    ax[0,0].plot(np.arange(n_iter+1), fds)
+    ax[0,0].set_title('nesterov pgd')
     ax[1,0].plot(np.arange(n_iter), gnorms)
+    ax[1,0].set_title('grad norm')
 
     X, Xs, Gs = gd(C, a, b, tau, gamma=0.9/tau, n_iter=n_iter)
     fs = [fval(C, a, b, tau, X) for X in Xs]
+    fds = [fdual(C, a, b, tau, X) for X in Xs]
     # print(f'pgd: f={fs[-1]:.3f}, X={X}')
     print(fs[-1])
     gnorms = [sqrt(norm2sq(G)) for G in Gs]
     ax[0,1].plot(np.arange(n_iter+1), fs)
+    ax[0,1].plot(np.arange(n_iter+1), fds)
+    ax[0,1].set_title('pgd')
     ax[1,1].plot(np.arange(n_iter), gnorms)
+    ax[1,1].set_title('grad_norm')
 
     ex_res, ex_X = exact(C, a, b, tau)
 
