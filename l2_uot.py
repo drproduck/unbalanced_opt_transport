@@ -18,12 +18,11 @@ def norm2sq(X):
 
 def fval(C, a, b, tau, X):
     r, c = C.shape
-    return np.sum(C * X) + tau / 2 * norm2sq(X - np.ones((r, 1)) @ b.T)
+    return np.sum(C * X) + tau / 2. * norm2sq(X - b.T)
 
 def fdual(C, a, b, tau, X):
     beta = - tau * (X.T.sum(axis=-1, keepdims=True) - b)
-    alpha = np.max(C - beta.T, axis=-1, keepdims=True)
-    pdb.set_trace()
+    alpha = np.min(C - beta.T, axis=-1, keepdims=True)
     d = np.sum(a * alpha) + np.sum(b * beta) - 1. / (2 * tau) * norm2sq(beta)
 
     return d
@@ -38,7 +37,7 @@ def grad(C, b, X, tau):
     """
 
     r, c = C.shape
-    return C + tau * (X - np.ones((r, 1)) @ b.T)
+    return C + tau * (X - b.T)
 
 
 def prox(X, G, L, a):
@@ -108,15 +107,12 @@ def exact(C, a, b, tau):
 
 if __name__ == '__main__':
     np.random.seed(0)
-    a = np.random.rand(100,1)
-    a = a / a.sum()
-    b = np.random.rand(200,1)
-    b = b / b.sum()
-    C = np.random.rand(100,200)
-    C = C / C.max()
+    a = np.random.rand(10,1)
+    b = np.random.rand(20,1)
+    C = np.random.rand(10,20)
     # C = (C + C.T) / 2
     tau = 1.
-    n_iter = 10
+    n_iter = 100
     X, Xs, Gs = fista(C, a, b, tau, n_iter=n_iter)
     fs = [fval(C, a, b, tau, X) for X in Xs]
     fds = [fdual(C, a, b, tau, X) for X in Xs]

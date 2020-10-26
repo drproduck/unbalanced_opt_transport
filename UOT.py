@@ -17,7 +17,7 @@ def f_dual(B, u, v, r, c, eta, t1, t2):
     """
     the dual of the entropic-regularized unbalanced OT
     """
-    f = eta * np.sum(B) + t1 * dotp(np.exp(- u / t1), r) + t2 * dotp(np.exp(- v / t2), c)
+    f = - eta * np.sum(B) - t1 * dotp(np.exp(- u / t1), r) - t2 * dotp(np.exp(- v / t2), c)
 
     return f
 
