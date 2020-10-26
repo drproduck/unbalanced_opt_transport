@@ -209,7 +209,9 @@ def projection_simplex(V, z=1, axis=None):
         cond = U - cssv / ind > 0
         rho = np.count_nonzero(cond, axis=1)
         theta = cssv[np.arange(len(V)), rho - 1] / (1. * rho)
-        return np.maximum(V - theta[:, np.newaxis], 0)
+        res = np.maximum(V - theta[:, np.newaxis], 0)
+        res[~np.isfinite(res)] = 0
+        return res
 
     elif axis == 0:
         return projection_simplex(V.T, z, axis=1).T
