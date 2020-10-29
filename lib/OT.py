@@ -1,25 +1,27 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from utils import *
+from scipy.special import logsumexp
 
-def get_B(C, u, v, eta):
-    return np.exp(- C / eta + u + v.T)
+def get_S(C, u, v, eta):
+    K = u + v.T - C
+    return np.exp(K / eta)
 
 
 def f(C, u, v, r, c, eta):
     """
     the dual of the entropic-regularized balanced OT
     """
-    A = get_B(C, u, v, eta)
-    f = np.sum(A) + dotp(u, r) + dotp(v, c)
+    S = get_S(C, u, v, eta)
+    f = dotp(u, r) + dotp(v, c) - eta * np.sum(S)
     return f
 
 
 def f_primal(C, u, v, eta):
-    A = get_B(C, u, v, eta)
-    unreg_val = dotp(C, A)
+    S = get_S(C, u, v, eta)
+    unreg_val = dotp(C, S)
 
-    entropy = get_entropy(A)
+    entropy = H(S)
 
     return unreg_val - eta * entropy
 
@@ -28,15 +30,15 @@ def unreg_f(C, u, v, eta):
     """
     the unregularized objective with solutions u, v
     """
-    A = get_B(C, u, v, eta)
+    S = get_S(C, u, v, eta)
 
-    return dotp(C, A)
+    return dotp(C, S)
 
 
 def norm1_constraint(C, u, v, r, c, eta):
-    A = get_B(C, u, v, eta)
-    a = A.sum(axis=1).reshape(-1, 1)
-    b = A.sum(axis=0).reshape(-1, 1)
+    S = get_S(C, u, v, eta)
+    a = S.sum(axis=1).reshape(-1, 1)
+    b = S.sum(axis=0).reshape(-1, 1)
     return norm1(a - r) + norm1(b - c)
 
 
@@ -48,6 +50,9 @@ def sinkhorn_ot(C, r, c, eta=1.0, n_iter=100, duals=False):
     :arg c: second marginal
     """
 
+    log_r = np.log(r)
+    log_c = np.log(c)
+
 
     # initial solutions
     u = np.zeros(r.shape)
@@ -55,13 +60,13 @@ def sinkhorn_ot(C, r, c, eta=1.0, n_iter=100, duals=False):
 
 
     for i in range(n_iter):
-        A = get_B(C, u, v, eta)
-        if i % 2 == 0:
-            a = A.sum(axis=1).reshape(-1, 1)
-            u = u + np.log(r) - np.log(a)
-        else:
-            b = A.sum(axis=0).reshape(-1, 1)
-            v = v + np.log(c) - np.log(b)
+        K = u + v.T - C
+        log_a = logsumexp(K / eta, axis=-1, keepdims=True)
+        u = eta * (u / eta + log_r - log_a)
+
+        K = u + v.T - C
+        log_b = logsumexp(K.T / eta, axis=-1, keepdims=True)
+        v = eta * (v / eta + log_c - log_b)
 
 
         rc_diff = norm1_constraint(C, u, v, r, c, eta)
@@ -69,10 +74,10 @@ def sinkhorn_ot(C, r, c, eta=1.0, n_iter=100, duals=False):
         if rc_diff < 1e-10:
             break
 
-    B = get_B(C, u, v, eta)
+    S = get_S(C, u, v, eta)
 
     if duals:
-        return B, u, v
+        return S, u, v
     else:
-        return B
+        return S
 

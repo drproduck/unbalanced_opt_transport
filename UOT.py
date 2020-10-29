@@ -461,7 +461,10 @@ def nesterov_unregularized_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100, lr=0.1, subs
     return X, info
 
 
+
 def conditional_uot(C, r, c, t1=1.0, t2=1.0, n_iter=100):
+
+    def step_v1(X_k):
 
     X_list = []
     unreg_f_val_list = []

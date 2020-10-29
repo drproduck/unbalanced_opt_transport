@@ -20,47 +20,52 @@ a[4,4] = 1.
 a[0, 2] = 1.
 a = a.reshape(25, 1)
 b = np.zeros((5, 5))
-b[0, 0] = 1.
-b[4, 2] = 1.
+b[0, 1] = 1.
+b[4, 3] = 1.
 b[4, 0] = 1.
 b = b.reshape(25, 1)
 a = a + 1e-16
 b = b + 1e-16
 
 C = cdist(supp, supp, 'euclidean')**2
+C = C / C.max()
 
-eta = 1.
-tau = 1.
-gamma = 0.1
-bs = []
+eta = 1
+tau = 100.
 
-X, beta_l2 =  pgd(C, a, b, tau, duals=True)
-X, beta_kl, _ = sinkhorn(C, a, b, eta, tau, duals=True)
-# print(beta_kl.reshape(5, 5))
+X, beta_l2 = fw(C, a, b, tau, duals=True)
+X, _, _ = sinkhorn(C, a, b, eta, tau, duals=True)
 beta_kl = - X.T.sum(axis=-1, keepdims=True) / b + 1
 
-X_ot, _, beta_ot = sinkhorn_ot(C, a / a.sum(), b / b.sum(), eta, 100, duals=True)
-print(np.exp(beta_ot.flatten()))
+X_ot, _, beta_ot = sinkhorn_ot(C, a / a.sum(), b / b.sum(), eta, duals=True)
 X_pot, log = ot.sinkhorn(a.flatten() / a.sum(), b.flatten() / b.sum(), C, eta, log=True)
+
+beta_pot = eta * np.log(log['v'])
 # print(np.abs(X_ot - X_pot).sum())
 
-print(X_ot[0])
-print(X_pot[0])
-
-beta_pot = log['v']
-# print(beta_ot)
 
 
-# print(beta_l2.reshape(5, 5))
-# print(beta_kl.reshape(5, 5))
-# print(beta_ot.reshape(5, 5))
+print(beta_l2.reshape(5, 5))
+print(beta_kl.reshape(5, 5))
+print(beta_ot.reshape(5, 5))
+print(beta_pot.reshape(5, 5))
     
 
-fig, ax = plt.subplots(1, 5)
+fig, ax = plt.subplots(1, 6)
 fig.set_size_inches(9, 3)
 ax[0].imshow(a.reshape(5, 5))
+ax[0].set_title('a')
 ax[1].imshow(b.reshape(5, 5))
+ax[1].set_title('b')
 ax[2].imshow(beta_l2.reshape(5, 5), cmap='plasma')
-ax[3].imshow(beta_kl.reshape(5, 5), cmap='plasma')
-ax[4].imshow(np.exp(beta_pot).reshape(5, 5), cmap='plasma')
+ax[2].set_title('l2_pgd')
+ax[3].imshow(beta_kl.reshape(5, 5), cmap='plasma', label='kl_uot')
+ax[3].set_title('kl_uot')
+ax[4].imshow(beta_ot.reshape(5, 5), cmap='plasma')
+ax[4].set_title('ot (mine)')
+im = ax[5].imshow(beta_pot.reshape(5, 5), cmap='plasma')
+ax[5].set_title('pot')
+
+fig.colorbar(im, ax=ax[5])
+
 plt.show()
