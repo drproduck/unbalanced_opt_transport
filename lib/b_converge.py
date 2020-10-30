@@ -36,7 +36,6 @@ def im_text(ax, data):
 
 
 
-
 a = np.zeros((5, 5))
 a[4,4] = 1.
 a[0, 2] = 1.
@@ -58,45 +57,73 @@ supp = np.concatenate((XX.reshape(-1,1), YY.reshape(-1,1)), axis=1)
 
 C = cdist(supp, supp, 'euclidean')**2
 
-eta = 0.001
+eta = 0.01
 tau = 100.
 
-X, beta_l2 = pgd(C, a, b, tau, duals=True)
-beta_l2 = beta_l2 / tau
-X, _, _ = kl_sinkhorn(C, a, b, eta, tau, duals=True)
-beta_kl = - X.T.sum(axis=-1, keepdims=True) / b + 1
+def get_beta(b, med):
 
-anorm = a / a.sum()
-bnorm = b / b.sum()
-X_ot, _, beta_ot = sinkhorn_ot(C, anorm, bnorm, eta, duals=True)
-beta_ot = beta_ot / norm1(b) - np.sum(beta_ot*b) / norm1(b)**2
+    if med == 'l2':
+        X, beta_l2 = pgd(C, a, b, tau, duals=True)
+        beta_l2 = beta_l2 / tau
+        
+        return beta_l2
 
-X_pot, log = ot.sinkhorn(anorm.flatten(), bnorm.flatten(), C, reg=eta, log=True)
+    elif med == 'kl':
+        X, _, _ = kl_sinkhorn(C, a, b, eta, tau, duals=True)
+        beta_kl = - X.T.sum(axis=-1, keepdims=True) / b + 1
 
-beta_pot = eta * np.log(log['v'])
-beta_pot = beta_pot / norm1(b) - np.sum(beta_pot*b) / norm1(b)**2
-beta_pot = beta_pot.reshape(-1, 1)
+        return beta_kl
+
+    elif med == 'ot':
+        anorm = a / a.sum()
+        bnorm = b / b.sum()
+        X_ot, _, beta_ot = sinkhorn_ot(C, anorm, bnorm, eta, duals=True)
+        beta_ot = beta_ot / norm1(b) - np.sum(beta_ot*b) / norm1(b)**2
+
+        return beta_ot
+
+    elif med == 'pot':
+        anorm = a / a.sum()
+        bnorm = b / b.sum()
+        X_pot, log = ot.sinkhorn(anorm.flatten(), bnorm.flatten(), C, reg=eta, log=True)
+
+        beta_pot = eta * np.log(log['v'])
+        beta_pot = beta_pot / norm1(b) - np.sum(beta_pot*b) / norm1(b)**2
+
+        beta_pot = beta_pot.reshape(-1, 1)
+
+        return beta_pot
+
+    elif med == 'l1':
+        beta_l1 = np.zeros(b.shape)
+        beta_l1[b > a] = 1.
+        beta_l1[b < a] = -1.
+
+        return beta_l1
 
 
-beta_l1 = np.zeros(b.shape)
-beta_l1[b > a] = 1.
-beta_l1[b < a] = -1.
-
-
-# print(beta_l2.reshape(5, 5))
-# print(beta_kl.reshape(5, 5))
-# print(beta_ot.reshape(5, 5))
-# print(beta_pot.reshape(5, 5))
-    
 def linf(x):
     return np.max(np.abs(x))
 
 
-def update(b, beta, gamma=1.):
-    print(b.shape, beta.shape)
+def update(b, beta, gamma=0.1):
     res = b - gamma * beta
     res[res < 0] = 0
-    return res
+    return res 
+
+def update_n(b, med, n_iter=10, gamma=0.1):
+    for t in range(n_iter):
+        beta = get_beta(b, med)
+        b = update(b, beta, gamma)
+
+    return b
+        
+
+b_l2 = update_n(b, med='l2')
+b_kl = update_n(b, med='kl')
+b_ot = update_n(b, med='ot')
+b_pot = update_n(b, med='pot')
+b_l1 = update_n(b, med='l1')
 
 fig, ax = plt.subplots(1, 7)
 fig.set_size_inches(9, 3)
@@ -108,25 +135,27 @@ ax[1].imshow(b.reshape(5, 5))
 ax[1].set_title('b')
 im_text(ax[1], b.reshape(5,5))
 
+
 # ax[2].imshow(beta_l2.reshape(5, 5), cmap='plasma')
-im_text(ax[2], update(b, beta_l2).reshape(5, 5))
-ax[2].set_title(f'l2_pgd_{linf(beta_l2):.3f}')
+ax[2].set_title(f'l2_pgd')
+im_text(ax[2], b_l2.reshape(5,5))
+
 
 # ax[3].imshow(beta_kl.reshape(5, 5), cmap='plasma')
-im_text(ax[3], update(b, beta_kl).reshape(5, 5))
-ax[3].set_title(f'kl_uot_{linf(beta_kl):.3f}')
+ax[3].set_title('kl_uot_{linf(beta_kl):.3f}')
+im_text(ax[3], b_kl.reshape(5,5))
 
 # ax[4].imshow(beta_ot.reshape(5, 5), cmap='plasma')
-im_text(ax[4], update(b, beta_ot).reshape(5, 5))
-ax[4].set_title(f'ot_(mine)_{linf(beta_ot):.3f}')
+ax[4].set_title('ot_(mine)_{linf(beta_ot):.3f}')
+im_text(ax[4], b_ot.reshape(5,5))
 
 # ax[5].imshow(beta_pot.reshape(5, 5), cmap='plasma')
-im_text(ax[5], update(b, beta_pot).reshape(5, 5))
-ax[5].set_title(f'pot_{linf(beta_pot):.3f}')
+ax[5].set_title('pot_{linf(beta_pot):.3f}')
+im_text(ax[5], b_pot.reshape(5,5))
 
 # ax[6].imshow(beta_l1.reshape(5, 5), cmap='plasma')
-im_text(ax[6], update(b, beta_l1).reshape(5, 5))
-ax[6].set_title(f'l1_{linf(beta_l1):.3f}')
+ax[6].set_title('l1_{linf(beta_l1):.3f}')
+im_text(ax[6], b_l1.reshape(5,5))
 
 # fig.colorbar(im, ax=ax[5])
 
