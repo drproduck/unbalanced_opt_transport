@@ -9,6 +9,7 @@ import ot
 from utils import *
 
 from scipy.sparse import coo_matrix
+from copy import copy
 
 
 def im_text(ax, data):
@@ -44,26 +45,29 @@ a = a.reshape(25, 1)
 # a = np.array([1., 1.]).reshape(-1, 1)
 b = np.zeros((5, 5))
 b[0, 1] = 1.
-b[4, 3] = 1.
-b[4, 0] = 1.
+b[4, 3] = 0.5
+b[4, 0] = 0.5
 b = b.reshape(25, 1)
 a = a + 1e-16
-b = b + 1e-16
+b_init = b + 1e-16
 
 xx = np.arange(5)
 yy = np.arange(5)
 XX, YY = np.meshgrid(xx, yy, indexing='ij')
 supp = np.concatenate((XX.reshape(-1,1), YY.reshape(-1,1)), axis=1)
 
-C = cdist(supp, supp, 'euclidean')**2
+C = cdist(supp, supp, 'euclidean')
+# C = np.zeros((25, 25))
 
-eta = 0.01
-tau = 100.
+eta = 10.
+tau = 10.
 
-def get_beta(b, med):
+def get_beta(b_pr, med):
+    b = copy(b_pr)
+    b[b <= 0] = 1e-16
 
     if med == 'l2':
-        X, beta_l2 = pgd(C, a, b, tau, duals=True)
+        X, beta_l2 = fw(C, a, b, tau, duals=True)
         beta_l2 = beta_l2 / tau
         
         return beta_l2
@@ -83,11 +87,13 @@ def get_beta(b, med):
         return beta_ot
 
     elif med == 'pot':
+        b = b.flatten()
         anorm = a / a.sum()
         bnorm = b / b.sum()
-        X_pot, log = ot.sinkhorn(anorm.flatten(), bnorm.flatten(), C, reg=eta, log=True)
+        X_pot, log = ot.sinkhorn(anorm.flatten(), bnorm, C, reg=eta, log=True)
 
         beta_pot = eta * np.log(log['v'])
+        # beta_pot = np.log(log['v'])
         beta_pot = beta_pot / norm1(b) - np.sum(beta_pot*b) / norm1(b)**2
 
         beta_pot = beta_pot.reshape(-1, 1)
@@ -107,31 +113,44 @@ def linf(x):
 
 
 def update(b, beta, gamma=0.1):
-    res = b - gamma * beta
-    res[res < 0] = 0
-    return res 
+    return b - gamma * beta
 
-def update_n(b, med, n_iter=10, gamma=0.1):
+def update_n(b_init, med, n_iter=100, lr=0.1):
+    b = copy(b_init)
     for t in range(n_iter):
         beta = get_beta(b, med)
-        b = update(b, beta, gamma)
+        b = update(b, beta, lr)
 
+    b[b <= 0] = 1e-16
     return b
         
 
-b_l2 = update_n(b, med='l2')
-b_kl = update_n(b, med='kl')
-b_ot = update_n(b, med='ot')
-b_pot = update_n(b, med='pot')
-b_l1 = update_n(b, med='l1')
+b_l2 = update_n(b_init, med='l2')
+X = fw(C, a, b_l2, tau=tau)
+X[X < 1e-16] = 0
+print('X')
+print(coo_matrix(X))
+
+print('row sum (=a)')
+print(X.sum(1).reshape(5,5))
+
+print('column sum (=b)')
+print(X.sum(0).reshape(5,5))
+
+b_kl = update_n(b_init, med='kl')
+b_ot = update_n(b_init, med='ot')
+b_ot = b_ot / b_ot.sum()
+b_pot = update_n(b_init, med='pot')
+b_pot = b_pot / b_pot.sum()
+b_l1 = update_n(b_init, med='l1')
 
 fig, ax = plt.subplots(1, 7)
 fig.set_size_inches(9, 3)
-ax[0].imshow(a.reshape(5, 5))
+# ax[0].imshow(a.reshape(5, 5))
 ax[0].set_title('a')
 im_text(ax[0], a.reshape(5,5))
 
-ax[1].imshow(b.reshape(5, 5))
+# ax[1].imshow(b.reshape(5, 5).T)
 ax[1].set_title('b')
 im_text(ax[1], b.reshape(5,5))
 
