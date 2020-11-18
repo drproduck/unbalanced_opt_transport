@@ -44,9 +44,9 @@ a = a.reshape(25, 1)
 # supp_a = np.array([[0,2], [4,4]])
 # a = np.array([1., 1.]).reshape(-1, 1)
 b = np.zeros((5, 5))
-b[0, 1] = 2.
-b[4, 3] = 3.
-b[4, 0] = 4.
+b[0, 1] = 0.5
+b[4, 3] = 0.5
+b[4, 0] = 1.
 b = b.reshape(25, 1)
 a = a + 1e-16
 b = b + 1e-16
@@ -58,24 +58,25 @@ supp = np.concatenate((XX.reshape(-1,1), YY.reshape(-1,1)), axis=1)
 
 C = cdist(supp, supp, 'euclidean')**2
 
-eta = 0.001
-tau = 0.1
+eta = 100.
+tau = 10.
 
 X, beta_l2 = fw(C, a, b, tau, duals=True)
 beta_l2 = beta_l2 / tau
+
 X, _, _ = kl_sinkhorn(C, a, b, eta, tau, duals=True)
-beta_kl = - X.T.sum(axis=-1, keepdims=True) / b + 1
+beta_kl = tau * (b - X.T.sum(axis=-1, keepdims=True))
 
 anorm = a / a.sum()
 bnorm = b / b.sum()
 X_ot, _, beta_ot = sinkhorn_ot(C, anorm, bnorm, eta, duals=True)
-beta_ot = beta_ot / norm1(b) - np.sum(beta_ot*b) / norm1(b)**2
+# beta_ot = beta_ot / norm1(b) - np.sum(beta_ot*b) / norm1(b)**2
 
 X_pot, log = ot.sinkhorn(anorm.flatten(), bnorm.flatten(), C, reg=eta, log=True)
 
 beta_pot = eta * np.log(log['v'])
 beta_pot = beta_pot.reshape(-1, 1)
-beta_pot = beta_pot / norm1(b) - np.sum(beta_pot*b) / norm1(b)**2
+# beta_pot = beta_pot / norm1(b) - np.sum(beta_pot*b) / norm1(b)**2
 
 
 beta_l1 = np.zeros(b.shape)

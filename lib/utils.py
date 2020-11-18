@@ -25,6 +25,9 @@ def dotp(x, y):
 def norm1(X):
     return np.sum(np.abs(X))
 
+def norm2(X):
+    return np.sqrt(np.sum(X**2))
+
 
 def supnorm(X):
     return np.max(np.abs(X))

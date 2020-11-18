@@ -1,6 +1,6 @@
 import utils
 import numpy as np
-from utils import projection_simplex
+from utils import *
 from math import sqrt
 import matplotlib.pyplot as plt
 import pdb
@@ -55,8 +55,10 @@ def a_pgd(C, a, b, tau, n_iter=100, X=None, duals=False, debug=False):
     Xs = []
 
     if X is None:
-        X = np.random.rand(*C.shape)
-        X = projection_simplex(X, a, axis=1)
+        # X = np.random.rand(*C.shape)
+        # X = projection_simplex(X, a, axis=1)
+
+        X = np.ones(C.shape) / c * a
 
         if debug:
             Xs.append(X)
@@ -88,10 +90,10 @@ def a_pgd(C, a, b, tau, n_iter=100, X=None, duals=False, debug=False):
 def pgd(C, a, b, tau, gamma=0.1, n_iter=100, X=None, duals=False, debug=False):
 
     Xs = []
+    Gs = []
 
     if X is None:
-        X = np.random.rand(*C.shape)
-        X = projection_simplex(X, a, axis=1)
+        X = np.ones(C.shape) / c * a
 
         if debug:
             Xs.append(X)
@@ -103,9 +105,10 @@ def pgd(C, a, b, tau, gamma=0.1, n_iter=100, X=None, duals=False, debug=False):
 
         if debug:
             Xs.append(X)
+            Gs.append(G)
 
     if debug:
-        return Xs
+        return Xs, Gs
 
     if duals:
         beta = tau * (b - X.T.sum(axis=-1, keepdims=True))
@@ -118,11 +121,13 @@ def fw(C, a, b, tau, n_iter=100, X=None, duals=False, debug=False):
     r, c = C.shape
 
     Xs = []
+    Gs = []
 
     if X is None:
-        X = np.random.rand(*C.shape)
-        X = X / X.sum(axis=-1, keepdims=True)
-        X = a * X # normalize
+        X = np.ones(C.shape) / c * a
+        # X = np.random.rand(*C.shape)
+        # X = X / X.sum(axis=-1, keepdims=True)
+        # X = a * X # normalize
 
         if debug:
             Xs.append(X)
@@ -134,11 +139,29 @@ def fw(C, a, b, tau, n_iter=100, X=None, duals=False, debug=False):
         X = (1 - gamma) * X
         X[np.arange(r), idx] = X[np.arange(r), idx] + gamma * a.flatten()
 
+        #G = grad(C, b, X, tau)
+        #idx = np.argmin(G, axis=-1)
+        #S = np.zeros(C.shape)
+        #S[np.arange(r), idx] = a.flatten()
+        #alpha = tau / 2. * norm2sq(S - X)
+        #beta = dotp(S - X, G)
+        #eta = - beta / 2 / alpha
+
+        #if 0 <= eta and eta <= 1:
+        #    gamma = eta
+        #elif eta < 0:
+        #    gamma = 0.
+        #else: gamma = 1.
+
+        #X = (1 - gamma) * X
+        #X[np.arange(r), idx] = X[np.arange(r), idx] + gamma * a.flatten()
+
         if debug:
             Xs.append(X)
+            Gs.append(G)
 
     if debug:
-        return Xs
+        return Xs, Gs
 
     if duals:
         beta = tau * (b - X.T.sum(axis=-1, keepdims=True))
@@ -161,13 +184,13 @@ def exact(C, a, b, tau):
 if __name__ == '__main__':
     np.random.seed(0)
     a = np.random.rand(200,1)
-    b = np.random.rand(400,1)
-    C = np.random.rand(200, 400)
+    b = np.random.rand(4000,1)
+    C = np.random.rand(200, 4000)
     # a = np.array([0.25, 0.75]).reshape(-1, 1)
     # b = np.array([0.75, 0.25]).reshape(-1, 1)
     # C = np.array([[0,1],[1,0]])
     # # C = (C + C.T) / 2
-    tau = 10.
+    tau = 1000.
     n_iter = 100
 
     # t_s = time.time()
@@ -180,30 +203,42 @@ if __name__ == '__main__':
     # plt.show()
     # print(Xs[-1])
 
+     #t_s = time.time()
+     #Xs = pgd(C, a, b, tau, gamma=0.99/tau, n_iter=n_iter, debug=True)
+     #print(time.time() - t_s)
+     #fs = [fval(C, a, b, tau, X) for X in Xs]
+     #fds = [fdual(C, a, b, tau, X) for X in Xs]
+     #plt.plot(np.arange(n_iter+1), fs)
+     #plt.plot(np.arange(n_iter+1), fds)
+     #print(fs)
+     #print(Xs[-1])
+
     t_s = time.time()
-    Xs = pgd(C, a, b, tau, gamma=0.99/tau, n_iter=n_iter, debug=True)
+    Xs, Gs = fw(C, a, b, tau, n_iter=n_iter, debug=True)
     print(time.time() - t_s)
     fs = [fval(C, a, b, tau, X) for X in Xs]
     fds = [fdual(C, a, b, tau, X) for X in Xs]
-    plt.plot(np.arange(n_iter+1), fs)
-    plt.plot(np.arange(n_iter+1), fds)
-    print(fs)
-    print(Xs[-1])
+    fig, ax = plt.subplots(2, 1)
+    fig.suptitle('Frank Wolfe')
+    ax[0].set_title('objective value')
+    min_fs = np.min(fs)
+    max_fds = np.max(fds)
+    ax[0].plot(np.arange(n_iter+1), fs, label=f'primal, min={min_fs:.3f}')
+    ax[0].plot(np.arange(n_iter+1), fds, label=f'dual, max={max_fds:.3f}, gap={min_fs-max_fds:.3f}')
+    ax[0].legend()
+    gns = [norm2(G) for G in Gs]
+    ax[1].set_title('gradient norm')
+    ax[1].plot(np.arange(n_iter), gns, label=f'min={np.min(gns):.3f}')
+    ax[1].legend()
 
-    t_s = time.time()
-    Xs = fw(C, a, b, tau, n_iter=n_iter, debug=True)
-    print(time.time() - t_s)
-    fs = [fval(C, a, b, tau, X) for X in Xs]
-    fds = [fdual(C, a, b, tau, X) for X in Xs]
-    plt.plot(np.arange(n_iter+1), fs)
-    plt.plot(np.arange(n_iter+1), fds)
-    print(fs[-1])
-    print(np.count_nonzero(Xs[-1]))
+    print(fs[-1], fds[-1], fs[-1] - fds[-1])
 
-    ex_res, ex_X = exact(C, a, b, tau)
+    # ex_res, ex_X = exact(C, a, b, tau)
 
-    print(f'exact: f={ex_res:.3f}, X={ex_X}')
-    print(ex_res)
-    print(np.count_nonzero(ex_X))
+    # print(f'exact: f={ex_res:.3f}, X={ex_X}')
+    # print(ex_res)
+
+    # print(np.count_nonzero(Xs[-1]))
+    # print(np.count_nonzero(ex_X))
 
     plt.show()
